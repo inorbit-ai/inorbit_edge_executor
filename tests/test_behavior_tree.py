@@ -1,16 +1,16 @@
 from logging import getLogger
 
 import pytest
-from missions.behavior_tree import BehaviorTree
-from missions.behavior_tree import BehaviorTreeBuilderContext
-from missions.datatypes import MissionDefinition
-from missions.datatypes import MissionRuntimeOptions
-from missions.datatypes import MissionRuntimeSharedMemory
-from missions.dummy_backend import DummyDB
-from missions.inorbit import InOrbitAPI
-from missions.inorbit import RobotApiFactory
-from missions.mission import Mission
-from missions.worker_pool import WorkerPool
+from inorbit_edge_executor.behavior_tree import BehaviorTree
+from inorbit_edge_executor.behavior_tree import BehaviorTreeBuilderContext
+from inorbit_edge_executor.datatypes import MissionDefinition
+from inorbit_edge_executor.datatypes import MissionRuntimeOptions
+from inorbit_edge_executor.datatypes import MissionRuntimeSharedMemory
+from inorbit_edge_executor.dummy_backend import DummyDB
+from inorbit_edge_executor.inorbit import InOrbitAPI
+from inorbit_edge_executor.inorbit import RobotApiFactory
+from inorbit_edge_executor.mission import Mission
+from inorbit_edge_executor.worker_pool import WorkerPool
 
 logger = getLogger("test-bt")
 
