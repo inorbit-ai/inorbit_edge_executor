@@ -10,7 +10,16 @@ from .datatypes import Pose
 from .datatypes import Robot
 from .mission import Mission
 from .mission import MissionTask
+from .logger import setup_logger
+from inorbit_edge.robot import RobotSessionFactory
+from inorbit_edge.robot import RobotSessionPool
+from inorbit_edge.missions import MISSION_STATE_EXECUTING
+from inorbit_edge.missions import MISSION_STATE_STARTING
+from inorbit_edge.missions import MISSION_STATE_ABORTED
+from inorbit_edge.missions import MISSION_STATE_COMPLETED
+from inorbit_edge.missions import MISSION_STATE_CANCELED
 
+logger = setup_logger("EdgeExecutor.InOrbit")
 
 def current_timestamp_ms():
     """
@@ -58,8 +67,6 @@ class MissionState(Enum):
         """
         return self.value
 
-
-logger = logging.getLogger("executor")
 
 # Id of the action to send a robot to a waypoint
 ACTION_NAVIGATE_TO_ID = "NavigateTo-000000"
@@ -142,14 +149,78 @@ class InOrbitAPI:
                 method="DELETE", url=f"{self._base_url}/{path}", json=body, headers=self.headers
             )
 
-
 class MissionTrackingMission:
+    """Wrapper for Mission Tracking API."""
+
+    def __init__(self, mission: Mission):
+        self._id = mission.id
+        self._mission = mission
+
+    @property
+    def id(self):
+        return self._id
+
+    @property
+    def robot_id(self):
+        return self._mission.robot_id
+
+    async def start(self, is_resume=False):
+        raise NotImplementedError(
+            "start() must be implemented in the derived class"
+        )
+
+    async def mark_in_progress(self):
+        raise NotImplementedError(
+            "mark_in_progress() must be implemented in the derived class"
+        )
+
+    async def get_mission(self):
+        raise NotImplementedError(
+            "get_mission() must be implemented in the derived class"
+        )
+
+    async def completed(self):
+        raise NotImplementedError(
+            "completed() must be implemented in the derived class"
+        )
+
+    async def pause(self):
+        raise NotImplementedError(
+            "pause() must be implemented in the derived class"
+        )
+
+    async def abort(self, status: MissionStatus = MissionStatus.error):
+        raise NotImplementedError(
+            "abort() must be implemented in the derived class"
+        )
+
+    async def report_tasks(self):
+        raise NotImplementedError(
+            "report_tasks() must be implemented in the derived class"
+        )
+
+    async def add_data(self, data):
+        raise NotImplementedError(
+            "add_data() must be implemented in the derived class"
+        )
+
+    async def resolve_arguments(self, arguments):
+        raise NotImplementedError(
+            "resolve_arguments() must be implemented in the derived class"
+        )
+
+    def _build_tasks_list(self):
+        return [t.model_dump(mode="json", by_alias=True) for t in self._mission.tasks_list]
+    
+    async def resolve_arguments(self, arguments):
+        return await MissionDataResolver(arguments, self._mission, self).resolve()
+
+class MissionTrackingAPI(MissionTrackingMission):
     """Wrapper for Mission Tracking API"""
 
     def __init__(self, mission: Mission, api: InOrbitAPI):
-        self._id = mission.id
+        super().__init__(mission)
         self._api = api
-        self._mission = mission
 
     @property
     def id(self):
@@ -209,9 +280,6 @@ class MissionTrackingMission:
             logger.warning(f"Error fetching mission state {e}")
             # TODO count this error for metrics
             return False
-
-    def _build_tasks_list(self):
-        return [t.model_dump(mode="json", by_alias=True) for t in self._mission.tasks_list]
 
     def _find_current_task_id(self):
         current_task: MissionTask = next(
@@ -299,9 +367,128 @@ class MissionTrackingMission:
             logger.warning(f"Error sending mission data to mission-tracking {e}")
             return False
 
-    async def resolve_arguments(self, arguments):
-        return await MissionDataResolver(arguments, self._mission, self).resolve()
+class MissionTrackingDatasource(MissionTrackingMission):
 
+    def __init__(self, mission: Mission, robot_session_pool: RobotSessionPool):
+        super().__init__(mission)
+        self._robot_session_pool = robot_session_pool
+        self._data = None
+
+    @property
+    def id(self):
+        return self._id
+
+    @property
+    def robot_id(self):
+        return self._mission.robot_id
+    
+    async def start(self, is_resume=False):
+
+        try:
+            robot_session = self._robot_session_pool.get_session(self._mission.robot_id)
+        except Exception as e:
+            logger.error(f"Error getting robot session {e}")
+            return False
+        
+        mt_key_values = {
+            "missionId": self._mission.id,
+            "label": self._mission.definition.label,
+            "inProgress": True,
+            "state": str(MissionState.starting),
+            "tasks": self._build_tasks_list(),
+            "endTs": current_timestamp_ms()
+        }
+
+        if not is_resume:
+            mt_key_values["startTs"] = current_timestamp_ms()
+        if self._mission.arguments:
+            mt_key_values["arguments"] = self._mission.arguments
+
+        try:
+            robot_session.publish_key_values(key_values={"mission_tracking": mt_key_values}, is_event=True)
+        except Exception as e:
+            logger.error(f"Error publishing key values {e}")
+            return False
+        
+
+    async def mark_in_progress(self):
+
+        try:
+            robot_session = self._robot_session_pool.get_session(self._mission.robot_id)
+        except Exception as e:
+            logger.error(f"Error getting robot session {e}")
+            return False
+        
+        mt_key_values = {
+            "missionId": self._mission.id,
+            "label": self._mission.definition.label,
+            "inProgress": True,
+            "state": str(MissionState.in_progress),
+            "endTs": current_timestamp_ms()
+        }
+
+        try:
+            robot_session.publish_key_values(key_values={"mission_tracking": mt_key_values}, is_event=True)
+        except Exception as e:
+            logger.error(f"Error publishing key values {e}")
+            return False
+
+    async def report_tasks(self):
+        pass
+
+    async def pause(self):
+        print("Mission paused")
+        pass
+
+    async def completed(self):
+        try:
+            robot_session = self._robot_session_pool.get_session(self._mission.robot_id)
+        except Exception as e:
+            logger.error(f"Error getting robot session {e}")
+            return False
+        
+        mt_key_values = {
+            "missionId": self._mission.id,
+            "label": self._mission.definition.label,
+            "inProgress": False,
+            "state": str(MissionState.completed),
+            "tasks": self._build_tasks_list(),
+            "endTs": current_timestamp_ms(),
+            "completedPercent": 100
+        }
+
+        try:
+            robot_session.publish_key_values({"mission_tracking": mt_key_values}, is_event=True)
+        except Exception as e:
+            logger.error(f"Error publishing key values {e}")
+            return False
+
+    async def abort(self, status: MissionStatus = MissionStatus.error):
+        try:
+            robot_session = self._robot_session_pool.get_session(self._mission.robot_id)
+        except Exception as e:
+            logger.error(f"Error getting robot session {e}")
+            return False
+        
+        mt_key_values = {
+            "missionId": self._mission.id,
+            "inProgress": False,
+            "state": str(MissionState.abandoned),
+            "status": "error",
+            "tasks": self._build_tasks_list(),
+            "endTs": current_timestamp_ms(),
+            "data": self._data
+        }
+
+        try:
+            robot_session.publish_key_values({"mission_tracking": mt_key_values}, is_event=True)
+        except Exception as e:
+            logger.error(f"Error publishing key values {e}")
+            return False
+    
+    async def add_data(self, data):
+        """Adds keys to the "data" field of a mission in Mission Tracking."""
+        self._data = data
 
 class MissionDataResolver:
     """
@@ -546,3 +733,16 @@ class RobotApiFactory:
 
     def build(self, robot_id: str):
         return RobotApi(Robot(id=robot_id), self._api)
+
+class InOrbitRobotSessionFactory:
+    """
+    Factory to create a session for a robot. This is used to create a session for a robot
+    in the InOrbit API.
+    """
+
+    def __init__(self, config:dict):
+        self._config:dict = config
+        self._robot_session_factory = RobotSessionFactory(**self._config)
+
+    def build(self):
+        return RobotSessionPool(self._robot_session_factory)
