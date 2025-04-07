@@ -386,7 +386,6 @@ class MissionTrackingDatasource(MissionTrackingMission):
     def __init__(self, mission: Mission, robot_session_pool: RobotSessionPool):
         super().__init__(mission)
         self._robot_session_pool = robot_session_pool
-        self._data = None
 
     @property
     def id(self):
@@ -404,6 +403,7 @@ class MissionTrackingDatasource(MissionTrackingMission):
         :param robot_session: Robot session to use for publishing the key values.
         """
         try:
+            # TODO: Make the key configurable.
             robot_session.publish_key_values({"mission_tracking": key_values}, is_event=True)
         except Exception as e:
             logger.error(f"Error publishing key values {e}")
@@ -518,8 +518,7 @@ class MissionTrackingDatasource(MissionTrackingMission):
             "missionId": self._mission.id,
             "inProgress": False,
             "state": str(MissionState.abandoned),
-            "status": "error",
-            "endTs": current_timestamp_ms()
+            "status": "error"
         }
 
         self._publish_kv(mt_key_values, robot_session=robot_session)
