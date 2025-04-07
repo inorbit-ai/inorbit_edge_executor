@@ -231,7 +231,10 @@ class MissionTrackingMission:
         return await MissionDataResolver(arguments, self._mission, self).resolve()
 
 class MissionTrackingAPI(MissionTrackingMission):
-    """Wrapper for Mission Tracking API"""
+    """
+    This class is used to send updates to the Mission Tracking API through the
+    InOrbit API. 
+    """
 
     def __init__(self, mission: Mission, api: InOrbitAPI):
         super().__init__(mission)
@@ -383,6 +386,10 @@ class MissionTrackingAPI(MissionTrackingMission):
             return False
 
 class MissionTrackingDatasource(MissionTrackingMission):
+    """
+    This class is used to send updates to the Mission Tracking API through the
+    InOrbit datasources. 
+    """
 
     def __init__(self, mission: Mission, robot_session_pool: RobotSessionPool):
         super().__init__(mission)
