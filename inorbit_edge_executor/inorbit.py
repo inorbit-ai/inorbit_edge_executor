@@ -240,14 +240,6 @@ class MissionTrackingAPI(MissionTrackingMission):
         super().__init__(mission)
         self._api = api
 
-    @property
-    def id(self):
-        return self._id
-
-    @property
-    def robot_id(self):
-        return self._mission.robot_id
-
     async def start(self, is_resume=False):
         """
         Starts a new Mission in Mission Tracking API and marks it as in progress.
@@ -416,6 +408,17 @@ class MissionTrackingDatasource(MissionTrackingMission):
         except Exception as e:
             logger.error(f"Error publishing key values {e}")
     
+    def _find_current_task_id(self) -> str | None:
+        """
+        Finds the id of the current task.
+
+        :return: The id of the current task
+        """
+        current_task: MissionTask = next(
+            (task for task in self._mission.tasks_list if not task.completed), None
+        )
+        return current_task.task_id if current_task else None
+    
     @with_robot_session
     async def start(self, is_resume=False, robot_session=None) -> None:
         """
@@ -427,11 +430,8 @@ class MissionTrackingDatasource(MissionTrackingMission):
         """       
         mt_key_values = {
             "missionId": self._mission.id,
-            "label": self._mission.definition.label,
             "inProgress": True,
-            "state": str(MissionState.starting),
-            "tasks": self._build_tasks_list(),
-            "endTs": current_timestamp_ms()
+            "state": str(MissionState.starting)
         }
 
         if not is_resume:
@@ -451,10 +451,8 @@ class MissionTrackingDatasource(MissionTrackingMission):
         """
         mt_key_values = {
             "missionId": self._mission.id,
-            "label": self._mission.definition.label,
             "inProgress": True,
-            "state": str(MissionState.in_progress),
-            "endTs": current_timestamp_ms()
+            "state": str(MissionState.in_progress)
         }
 
         self._publish_kv(mt_key_values, robot_session=robot_session)
@@ -465,13 +463,16 @@ class MissionTrackingDatasource(MissionTrackingMission):
         :param robot_session: Robot session to use for publishing the key values
         :return: None
         """
-        my_key_values = {
+        mt_key_values = {
             "missionId": self._mission.id,
-            "label": self._mission.definition.label,
             "tasks": self._build_tasks_list()
         }
 
-        self._publish_kv(my_key_values, robot_session=robot_session)
+        current_task_id = self._find_current_task_id()
+        if current_task_id:
+            mt_key_values["currentTaskId"] = current_task_id
+
+        self._publish_kv(mt_key_values, robot_session=robot_session)
 
     @with_robot_session
     async def pause(self, robot_session=None) -> None:
@@ -483,8 +484,6 @@ class MissionTrackingDatasource(MissionTrackingMission):
         """
         mt_key_values = {
             "missionId": self._mission.id,
-            "label": self._mission.definition.label,
-            "inProgress": True,
             "state": str(MissionState.paused),
             "tasks": self._build_tasks_list()
         }
@@ -501,11 +500,8 @@ class MissionTrackingDatasource(MissionTrackingMission):
         """
         mt_key_values = {
             "missionId": self._mission.id,
-            "label": self._mission.definition.label,
             "inProgress": False,
-            "state": str(MissionState.completed),
-            "tasks": self._build_tasks_list(),
-            "endTs": current_timestamp_ms()
+            "state": str(MissionState.completed)
         }
 
         self._publish_kv(mt_key_values, robot_session=robot_session)
@@ -523,21 +519,26 @@ class MissionTrackingDatasource(MissionTrackingMission):
             "inProgress": False,
             "state": str(MissionState.abandoned),
             "status": "error",
-            "tasks": self._build_tasks_list(),
-            "endTs": current_timestamp_ms(),
-            "data": self._data
+            "endTs": current_timestamp_ms()
         }
 
         self._publish_kv(mt_key_values, robot_session=robot_session)
-    
-    async def add_data(self, data) -> None:
+
+    @with_robot_session    
+    async def add_data(self, data:dict, robot_session=None) -> None:
         """
         Adds keys to the "data" field of a mission in Mission Tracking.
 
         :param data: Data to add to the mission
+        :param robot_session: Robot session to use for publishing the key values.
         :return: None
         """
-        self._data = data
+        mt_key_values = {
+            "missionId": self._mission.id,
+            "data": data
+        }
+
+        self._publish_kv(mt_key_values, robot_session=robot_session)
 
 class MissionDataResolver:
     """
