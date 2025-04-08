@@ -29,11 +29,14 @@ from .exceptions import RobotBusyException
 from .exceptions import TranslationException
 from .inorbit import InOrbitAPI
 from .inorbit import MissionStatus
-from .inorbit import MissionTrackingMission
+from .inorbit import MissionTrackingAPI
+from .inorbit import MissionTrackingDatasource
 from .inorbit import RobotApiFactory
+from .inorbit import InOrbitRobotSessionFactory
 from .logger import setup_logger
 from .mission import Mission
 from .worker import Worker
+from .datatypes import MissionTrackingTypes
 
 logger = setup_logger(name="WorkerPool")
 
@@ -58,11 +61,15 @@ class WorkerPool:
        Normally, only the definition part of the mission would be changed.
     """
 
-    def __init__(self, api: InOrbitAPI, db: WorkerPersistenceDB):
+    def __init__(self, api: InOrbitAPI, db: WorkerPersistenceDB, mt_type: MissionTrackingTypes = None, robot_session_config:dict = None):
         if not api:
             raise Exception("Missing InOrbitAPI for WorkerPool initialization")
         self._api = api
         self._db = db
+        if mt_type == MissionTrackingTypes.DATASOURCE and not robot_session_config:
+            raise Exception("Missing robot_session_config for Mission Tracking Datasource type.")
+        self._mt_type: MissionTrackingTypes = mt_type
+        self._robot_session_config = robot_session_config
         # Workers, by mission id. Protected by self._mutex
         self._workers = {}
         # No work can be received until this flag is True, set during start().
@@ -197,7 +204,17 @@ class WorkerPool:
         robot_api_factory = RobotApiFactory(self._api)
         context.robot_api_factory = robot_api_factory
         context.robot_api = robot_api_factory.build(mission.robot_id)
-        context.mt = MissionTrackingMission(mission, self._api)
+
+        if self._mt_type == MissionTrackingTypes.DATASOURCE:
+            try:
+                robot_session_factory = InOrbitRobotSessionFactory(self._robot_session_config)
+                robot_session_pool = robot_session_factory.build()
+            except Exception as e:
+                logger.error(f"Error creating robot session pool: {e}")
+                raise
+            context.mt = MissionTrackingDatasource(mission, robot_session_pool)
+        else:
+            context.mt = MissionTrackingAPI(mission, self._api)
 
     def translate_mission(self, mission: Mission):
         """

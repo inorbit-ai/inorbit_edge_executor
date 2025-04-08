@@ -20,6 +20,9 @@ from pydantic import Field
 # FIXME(herchu) Remove Bluebotics dependency
 # from missions.datatypes import MissionStepCreateBlueBoticsMission
 
+class MissionTrackingTypes(Enum):
+    API = "api"
+    DATASOURCE = "datasource"
 
 class MissionStepTypes(Enum):
     SET_DATA = "setData"

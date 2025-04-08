@@ -10,6 +10,30 @@ from .datatypes import Pose
 from .datatypes import Robot
 from .mission import Mission
 from .mission import MissionTask
+from .logger import setup_logger
+from inorbit_edge.robot import RobotSessionFactory
+from inorbit_edge.robot import RobotSessionPool
+from functools import wraps
+
+logger = setup_logger("EdgeExecutor.InOrbit")
+
+def with_robot_session(func):
+    """
+    Decorator to get robot session. It's used by MissionTrackingDatasources
+    class to get the robot session from the pool and inject it into the function.
+    """
+    @wraps(func)
+    async def wrapper(self, *args, **kwargs):
+        try:
+            robot_session = self._robot_session_pool.get_session(self._mission.robot_id)
+        except Exception as e:
+            logger.error(f"Error getting robot session {e}")
+            return False
+        
+        # Inject robot_session as keyword argument
+        return await func(self, *args, robot_session=robot_session, **kwargs)
+    
+    return wrapper
 
 
 def current_timestamp_ms():
@@ -58,8 +82,6 @@ class MissionState(Enum):
         """
         return self.value
 
-
-logger = logging.getLogger("executor")
 
 # Id of the action to send a robot to a waypoint
 ACTION_NAVIGATE_TO_ID = "NavigateTo-000000"
@@ -142,13 +164,11 @@ class InOrbitAPI:
                 method="DELETE", url=f"{self._base_url}/{path}", json=body, headers=self.headers
             )
 
-
 class MissionTrackingMission:
-    """Wrapper for Mission Tracking API"""
+    """Wrapper for Mission Tracking API."""
 
-    def __init__(self, mission: Mission, api: InOrbitAPI):
+    def __init__(self, mission: Mission):
         self._id = mission.id
-        self._api = api
         self._mission = mission
 
     @property
@@ -158,6 +178,67 @@ class MissionTrackingMission:
     @property
     def robot_id(self):
         return self._mission.robot_id
+
+    async def start(self, is_resume=False):
+        raise NotImplementedError(
+            "start() must be implemented in the derived class"
+        )
+
+    async def mark_in_progress(self):
+        raise NotImplementedError(
+            "mark_in_progress() must be implemented in the derived class"
+        )
+
+    async def get_mission(self):
+        raise NotImplementedError(
+            "get_mission() must be implemented in the derived class"
+        )
+
+    async def completed(self):
+        raise NotImplementedError(
+            "completed() must be implemented in the derived class"
+        )
+
+    async def pause(self):
+        raise NotImplementedError(
+            "pause() must be implemented in the derived class"
+        )
+
+    async def abort(self, status: MissionStatus = MissionStatus.error):
+        raise NotImplementedError(
+            "abort() must be implemented in the derived class"
+        )
+
+    async def report_tasks(self):
+        raise NotImplementedError(
+            "report_tasks() must be implemented in the derived class"
+        )
+
+    async def add_data(self, data):
+        raise NotImplementedError(
+            "add_data() must be implemented in the derived class"
+        )
+
+    async def resolve_arguments(self, arguments):
+        raise NotImplementedError(
+            "resolve_arguments() must be implemented in the derived class"
+        )
+
+    def _build_tasks_list(self):
+        return [t.model_dump(mode="json", by_alias=True) for t in self._mission.tasks_list]
+    
+    async def resolve_arguments(self, arguments):
+        return await MissionDataResolver(arguments, self._mission, self).resolve()
+
+class MissionTrackingAPI(MissionTrackingMission):
+    """
+    This class is used to send updates to the Mission Tracking API through the
+    InOrbit API. 
+    """
+
+    def __init__(self, mission: Mission, api: InOrbitAPI):
+        super().__init__(mission)
+        self._api = api
 
     async def start(self, is_resume=False):
         """
@@ -209,9 +290,6 @@ class MissionTrackingMission:
             logger.warning(f"Error fetching mission state {e}")
             # TODO count this error for metrics
             return False
-
-    def _build_tasks_list(self):
-        return [t.model_dump(mode="json", by_alias=True) for t in self._mission.tasks_list]
 
     def _find_current_task_id(self):
         current_task: MissionTask = next(
@@ -299,9 +377,167 @@ class MissionTrackingMission:
             logger.warning(f"Error sending mission data to mission-tracking {e}")
             return False
 
-    async def resolve_arguments(self, arguments):
-        return await MissionDataResolver(arguments, self._mission, self).resolve()
+class MissionTrackingDatasource(MissionTrackingMission):
+    """
+    This class is used to send updates to the Mission Tracking API through the
+    InOrbit datasources. 
+    """
 
+    def __init__(self, mission: Mission, robot_session_pool: RobotSessionPool):
+        super().__init__(mission)
+        self._robot_session_pool = robot_session_pool
+
+    @property
+    def id(self):
+        return self._id
+
+    @property
+    def robot_id(self):
+        return self._mission.robot_id
+    
+    def _publish_kv(self, key_values, robot_session=None) -> None:
+        """
+        Publishes key values to the robot session.
+
+        :param key_values: Key values to publish
+        :param robot_session: Robot session to use for publishing the key values.
+        """
+        try:
+            # TODO: Make the key configurable.
+            robot_session.publish_key_values({"mission_tracking": key_values}, is_event=True)
+        except Exception as e:
+            logger.error(f"Error publishing key values {e}")
+    
+    def _find_current_task_id(self) -> str | None:
+        """
+        Finds the id of the current task.
+
+        :return: The id of the current task
+        """
+        current_task: MissionTask = next(
+            (task for task in self._mission.tasks_list if not task.completed), None
+        )
+        return current_task.task_id if current_task else None
+    
+    @with_robot_session
+    async def start(self, is_resume=False, robot_session=None) -> None:
+        """
+        Marks the mission as started in Mission Tracking API
+
+        :param is_resume: True if the mission was paused and its execution is being resumed
+        :param robot_session: Robot session to use for publishing the key values
+        :return: None
+        """       
+        mt_key_values = {
+            "missionId": self._mission.id,
+            "inProgress": True,
+            "state": str(MissionState.starting)
+        }
+
+        if not is_resume:
+            mt_key_values["startTs"] = current_timestamp_ms()
+        if self._mission.arguments:
+            mt_key_values["arguments"] = self._mission.arguments
+
+        self._publish_kv(mt_key_values, robot_session=robot_session)
+        
+    @with_robot_session
+    async def mark_in_progress(self, robot_session=None) -> None:
+        """
+        Marks the mission as in progress in Mission Tracking API
+        
+        :param robot_session: Robot session to use for publishing the key values
+        :return: None
+        """
+        mt_key_values = {
+            "missionId": self._mission.id,
+            "inProgress": True,
+            "state": str(MissionState.in_progress)
+        }
+
+        self._publish_kv(mt_key_values, robot_session=robot_session)
+
+    async def report_tasks(self, robot_session=None) -> None:
+        """
+        Updates the "tasks" list of the mission in Mission Tracking.
+        :param robot_session: Robot session to use for publishing the key values
+        :return: None
+        """
+        mt_key_values = {
+            "missionId": self._mission.id,
+            "tasks": self._build_tasks_list()
+        }
+
+        current_task_id = self._find_current_task_id()
+        if current_task_id:
+            mt_key_values["currentTaskId"] = current_task_id
+
+        self._publish_kv(mt_key_values, robot_session=robot_session)
+
+    @with_robot_session
+    async def pause(self, robot_session=None) -> None:
+        """
+        Marks the mission as paused in Mission Tracking API
+
+        :param robot_session: Robot session to use for publishing the key values
+        :return: None
+        """
+        mt_key_values = {
+            "missionId": self._mission.id,
+            "state": str(MissionState.paused),
+            "tasks": self._build_tasks_list()
+        }
+
+        self._publish_kv(mt_key_values, robot_session=robot_session)
+    
+    @with_robot_session
+    async def completed(self, robot_session=None) -> None:
+        """
+        Marks the mission as completed in Mission Tracking API.
+
+        :param robot_session: Robot session to use for publishing the key values
+        :return: None
+        """
+        mt_key_values = {
+            "missionId": self._mission.id,
+            "inProgress": False,
+            "state": str(MissionState.completed)
+        }
+
+        self._publish_kv(mt_key_values, robot_session=robot_session)
+        
+    @with_robot_session
+    async def abort(self, status: MissionStatus = MissionStatus.error, robot_session=None) -> None:
+        """
+        Marks the mission as aborted in Mission Tracking API.
+
+        :param robot_session: Robot session to use for publishing the key values
+        :return: None
+        """
+        mt_key_values = {
+            "missionId": self._mission.id,
+            "inProgress": False,
+            "state": str(MissionState.abandoned),
+            "status": "error"
+        }
+
+        self._publish_kv(mt_key_values, robot_session=robot_session)
+
+    @with_robot_session    
+    async def add_data(self, data:dict, robot_session=None) -> None:
+        """
+        Adds keys to the "data" field of a mission in Mission Tracking.
+
+        :param data: Data to add to the mission
+        :param robot_session: Robot session to use for publishing the key values.
+        :return: None
+        """
+        mt_key_values = {
+            "missionId": self._mission.id,
+            "data": data
+        }
+
+        self._publish_kv(mt_key_values, robot_session=robot_session)
 
 class MissionDataResolver:
     """
@@ -546,3 +782,16 @@ class RobotApiFactory:
 
     def build(self, robot_id: str):
         return RobotApi(Robot(id=robot_id), self._api)
+
+class InOrbitRobotSessionFactory:
+    """
+    Factory to create a session for a robot. This is used to create a session for a robot
+    in the InOrbit API.
+    """
+
+    def __init__(self, config:dict):
+        self._config:dict = config
+        self._robot_session_factory = RobotSessionFactory(**self._config)
+
+    def build(self):
+        return RobotSessionPool(self._robot_session_factory)
