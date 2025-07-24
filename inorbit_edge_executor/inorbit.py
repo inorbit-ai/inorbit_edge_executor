@@ -152,7 +152,6 @@ class InOrbitAPI:
         return httpx.post(f"{self._base_url}/{path}", json=body, headers=self.headers)
 
     async def put(self, path, body=None):
-        print(f"Putting {body} to {self._base_url}/{path}")
         return httpx.put(f"{self._base_url}/{path}", json=body, headers=self.headers)
 
     async def delete(self, path, body=None):

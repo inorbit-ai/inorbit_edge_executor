@@ -638,7 +638,7 @@ class WaitExpressionNode(BehaviorTree):
             object["target"] = self.target.dump_object()
         object["retry_wait_secs"] = self.retry_wait_secs
         return object
-    
+
     @classmethod
     def from_object(cls, context, expression, target=None, **kwargs):
         if target is not None:
