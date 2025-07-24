@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="inorbit_edge_executor",
-    version="2.0.0",
+    version="3.0.0",
     description="InOrbit Edge Missions Executor",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
