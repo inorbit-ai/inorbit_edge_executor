@@ -98,7 +98,7 @@ class MissionStepSetData(MissionStep):
     Mission step for adding metadata to a mission
     """
 
-    data: Dict[str, Union[str, int, float, bool]]
+    data: Dict[str, Union[str, int, float, bool, dict]]
 
     def accept(self, visitor):
         return visitor.visit_set_data(self)

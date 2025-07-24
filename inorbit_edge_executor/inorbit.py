@@ -152,6 +152,7 @@ class InOrbitAPI:
         return httpx.post(f"{self._base_url}/{path}", json=body, headers=self.headers)
 
     async def put(self, path, body=None):
+        print(f"Putting {body} to {self._base_url}/{path}")
         return httpx.put(f"{self._base_url}/{path}", json=body, headers=self.headers)
 
     async def delete(self, path, body=None):
@@ -660,8 +661,9 @@ class MissionDataResolver:
 class RobotApi:
     """Wrapper for Robot APIs"""
 
-    def __init__(self, robot_id: Robot, api: InOrbitAPI):
-        self._robot_id = robot_id
+    def __init__(self, robot: Robot, api: InOrbitAPI):
+        self._robot = robot
+        self._robot_id = robot.id
         self._api = api
 
     @property

@@ -169,6 +169,7 @@ def test_bt_wait_expression():
         "state": "",
         "expression": "0>1",
         "target": {"robot_id": "robot456"},
+        "retry_wait_secs": 3,
     }
     assert expected_obj == step_node
 

@@ -76,15 +76,17 @@ class BehaviorTreeBuilderContext:
     happens during dispatching a mission or de-serializing incomplete missions from storage.
     """
 
-    def __init__(self):
-        self._robot_api = None
-        self._mt = None
-        self._mission = None
-        self._error_context = None
-        self._robot_api_factory = None
-        self._options = None
-        self._shared_memory = None
-        pass
+    def __init__(self, robot_api: RobotApi = None, mt: MissionTrackingMission = None,
+                 mission: Mission = None, error_context: Dict[str, str] = {},
+                 robot_api_factory: RobotApiFactory = None, options: MissionRuntimeOptions = None,
+                 shared_memory: MissionRuntimeSharedMemory = None):
+        self._robot_api = robot_api
+        self._mt = mt
+        self._mission = mission
+        self._error_context = error_context
+        self._robot_api_factory = robot_api_factory
+        self._options = options
+        self._shared_memory = shared_memory
 
     @property
     def robot_api(self) -> RobotApi:
@@ -599,22 +601,34 @@ class WaitExpressionNode(BehaviorTree):
     """
 
     def __init__(
-        self, context: BehaviorTreeBuilderContext, expression: str, target: Target = None, **kwargs
+        self,
+        context: BehaviorTreeBuilderContext,
+        expression: str,
+        target: Target = None,
+        retry_wait_secs: float = 3,
+        **kwargs,
     ):
         super().__init__(**kwargs)
         self.expression = expression
         self.target = target
         if self.target is None:
-            self.robot = context.robot
+            self.robot = context.robot_api
         else:
             self.robot = context.robot_api_factory.build(self.target.robot_id)
+        self.retry_wait_secs = retry_wait_secs
 
     async def _execute(self):
         result = False
-        logger.debug(f"waiting for expression {self.expression} on {self.robot.robot_id}")
+        logger.debug(
+            f"waiting for expression {self.expression} on {self.robot.robot_id}"
+        )
         while not result:
-            result = await self.robot.evaluate_expression(self.expression)
-            await asyncio.sleep(3)
+            try:
+                result = await self.robot.evaluate_expression(self.expression)
+            except Exception as e:
+                logger.error(f"Error evaluating expression {self.expression}: {e}")
+            if not result:
+                await asyncio.sleep(self.retry_wait_secs)
         logger.debug(f"expression {self.expression} == true")
 
     def dump_object(self):
@@ -622,8 +636,9 @@ class WaitExpressionNode(BehaviorTree):
         object["expression"] = self.expression
         if self.target is not None:
             object["target"] = self.target.dump_object()
+        object["retry_wait_secs"] = self.retry_wait_secs
         return object
-
+    
     @classmethod
     def from_object(cls, context, expression, target=None, **kwargs):
         if target is not None:
@@ -634,6 +649,14 @@ class WaitExpressionNode(BehaviorTree):
 class DummyNode(BehaviorTree):
     async def _execute(self):
         pass
+
+    @classmethod
+    def from_object(
+        cls,
+        context,
+        **kwargs,
+    ):
+        return DummyNode(**kwargs)
 
 
 class MissionStartNode(BehaviorTree):
@@ -810,10 +833,22 @@ class SetDataNode(BehaviorTree):
     ):
         self.mt = context.mt
         self.data = data
+        self.robot = context.robot_api
+        self.robot_api_factory = context.robot_api_factory
         super().__init__(*args, **kwargs)
 
     async def _execute(self):
-        await self.mt.add_data(self.data)
+        data_dict = {}
+        for key, value in self.data.items():
+            if isinstance(value, dict):
+                expression = value.get("expression")
+                target_robot_id = value.get("target", {}).get("robotId")
+                robot = self.robot_api_factory.build(target_robot_id) if target_robot_id else self.robot
+                evaluated_data = await robot.evaluate_expression(expression)
+                data_dict[key] = evaluated_data
+            else:
+                data_dict[key] = value
+        await self.mt.add_data(data_dict)
 
     def dump_object(self):
         object = super().dump_object()
@@ -868,6 +903,40 @@ class UnlockRobotNode(BehaviorTree):
     @classmethod
     def from_object(cls, context, **kwargs):
         return UnlockRobotNode(context, **kwargs)
+
+
+class MissionStepCancelledNode(BehaviorTree):
+    """
+    Node to cancel the entire mission when a mission step is cancelled.
+    It's only necessary for steps which have subtrees (e.g. waypoints).
+    """
+
+    def __init__(
+        self,
+        context: BehaviorTreeBuilderContext,
+        node_state: str,
+        *args,
+        **kwargs,
+    ):
+        self.context = context
+        self.node_state = node_state
+        super().__init__(*args, **kwargs)
+
+    async def _execute(self):
+        self.state = (
+            self.node_state
+            if self.node_state in [NODE_STATE_ERROR, NODE_STATE_CANCELLED]
+            else NODE_STATE_ERROR
+        )
+
+    def dump_object(self):
+        object = super().dump_object()
+        object["node_state"] = self.node_state
+        return object
+
+    @classmethod
+    def from_object(cls, context, node_state, **kwargs):
+        return MissionStepCancelledNode(context, node_state, **kwargs)
 
 
 class NodeFromStepBuilder:
@@ -939,9 +1008,12 @@ class NodeFromStepBuilder:
         )
         on_cancel.add_node(cancel_nav_on_cancel)
         on_cancel.add_node(
-            MissionAbortedNode(self.context, status=MissionStatus.ok, label="mission cancelled")
+            MissionStepCancelledNode(
+                self.context,
+                node_state=NODE_STATE_CANCELLED,
+                label=f"mission canceled pose waypoint - {step.waypoint}",
+            )
         )
-        on_cancel.add_node(UnlockRobotNode(self.context, label="unlock robot after mission cancel"))
         on_error = BehaviorTreeSequential(label="error handlers")
         cancel_nav_on_error = RunActionNode(
             context=self.context,
@@ -952,9 +1024,12 @@ class NodeFromStepBuilder:
         # Error handler
         on_error.add_node(cancel_nav_on_error)
         on_error.add_node(
-            MissionAbortedNode(self.context, status=MissionStatus.error, label="mission aborted")
+            MissionStepCancelledNode(
+                self.context,
+                node_state=NODE_STATE_ERROR,
+                label=f"mission error pose waypoint: {step.waypoint}",
+            )
         )
-        on_error.add_node(UnlockRobotNode(self.context, label="unlock robot after mission abort"))
         tree = BehaviorTreeErrorHandler(
             context=self.context,
             behavior=bt_sequential,
@@ -1006,16 +1081,21 @@ accepted_node_types = [
     BehaviorTreeSequential,
     BehaviorTreeErrorHandler,
     WaitNode,
+    RunActionNode,
+    WaitExpressionNode,
+    DummyNode,
     TimeoutNode,
     MissionStartNode,
     MissionCompletedNode,
     MissionAbortedNode,
     TaskStartedNode,
     TaskCompletedNode,
+    SetDataNode,
     LockRobotNode,
     UnlockRobotNode,
     MissionPausedNode,
     MissionInProgressNode,
+    MissionStepCancelledNode,
 ]
 tree_node_class_map = {}
 
