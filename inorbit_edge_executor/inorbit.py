@@ -662,12 +662,11 @@ class RobotApi:
 
     def __init__(self, robot: Robot, api: InOrbitAPI):
         self._robot = robot
-        self._robot_id = robot.id
         self._api = api
 
     @property
     def robot_id(self):
-        return self._robot_id
+        return self._robot.id
 
     async def execute_action(self, action_id: str, arguments):
         req = {"actionId": action_id, "parameters": arguments if arguments is not None else {}}
