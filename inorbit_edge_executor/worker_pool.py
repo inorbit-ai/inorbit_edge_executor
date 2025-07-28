@@ -30,7 +30,6 @@ from .exceptions import TranslationException
 from .inorbit import InOrbitAPI
 from .inorbit import MissionStatus
 from .inorbit import MissionTrackingAPI
-from .inorbit import MissionTrackingDatasource
 from .inorbit import RobotApiFactory
 from .inorbit import InOrbitRobotSessionFactory
 from .logger import setup_logger
