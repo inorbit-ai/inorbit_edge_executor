@@ -206,13 +206,7 @@ class WorkerPool:
         context.robot_api = robot_api_factory.build(mission.robot_id)
 
         if self._mt_type == MissionTrackingTypes.DATASOURCE:
-            try:
-                robot_session_factory = InOrbitRobotSessionFactory(self._robot_session_config)
-                robot_session_pool = robot_session_factory.build()
-            except Exception as e:
-                logger.error(f"Error creating robot session pool: {e}")
-                raise
-            context.mt = MissionTrackingDatasource(mission, robot_session_pool)
+            raise NotImplementedError("Mission tracking datasource is not supported")
         else:
             context.mt = MissionTrackingAPI(mission, self._api)
 

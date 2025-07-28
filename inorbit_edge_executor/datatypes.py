@@ -119,6 +119,9 @@ class MissionStepPoseWaypoint(MissionStep):
     def get_type(self):
         return MissionStepTypes.POSE_WAYPOINT.value
 
+    def accept(self, visitor):
+        return visitor.visit_pose_waypoint(self)
+
 
 class MissionStepWaitUntil(MissionStep):
     """
@@ -179,6 +182,9 @@ class MissionStepRunAction(MissionStep):
 
     def get_type(self):
         return MissionStepTypes.RUN_ACTION.value
+    
+    def accept(self, visitor):
+        return visitor.visit_run_action(self)
 
 
 class MissionDefinition(BaseModel):
