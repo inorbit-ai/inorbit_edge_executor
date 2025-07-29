@@ -210,31 +210,3 @@ class SqliteDB(WorkerPersistenceDB):
         await queries.delete_finished_missions(self.db)
         await self.db.commit()
 
-    # async def set_bluebotics_mission_id(
-    #     self, bluebotics_mission_id: str, inorbit_mission_id: str
-    # ) -> None:
-    #     """
-    #     Sets the bluebotics mission id in the DB
-
-    #     Args:
-    #         bluebotics_mission_id (str): The bluebotics mission id to be set in the DB
-
-    #     Returns:
-    #         None
-    #     """
-    #     await queries.set_bluebotics_mission_id(
-    #         self.db, bluebotics_mission_id=bluebotics_mission_id, mission_id=inorbit_mission_id
-    #     )
-    #     await self.db.commit()
-
-    # async def get_bluebotics_mission_id(self, mission_id: str) -> str:
-    #     """
-    #     Gets the bluebotics mission id from the DB
-
-    #     Returns:
-    #         str: The bluebotics mission id
-    #     """
-    #     mission_row = await queries.get_mission(self.db, mission_id=mission_id)
-    #     if len(mission_row) == 0:
-    #         return None
-    #     return mission_row[0]["bluebotics_mission_id"]

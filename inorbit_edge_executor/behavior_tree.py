@@ -17,8 +17,6 @@ TODOs in this file:
  - Correctly resume timeout/wait nodes, taking into account the time left
  - For Action nodes, read API response and fail if the action was not executed. (Even better: wait
    for completion if the state is 'running')
- - Implement pause/repeat/etc to control execution of a mission. We may need to change the way
-   they are implemented (instead of a single task, have tasks be only 1 node?)
 """
 import asyncio
 import math
@@ -561,7 +559,7 @@ class RunActionNode(BehaviorTree):
         self.arguments = arguments
         self.target = target
         if self.target is None:
-            self.robot = context.robot
+            self.robot = context.robot_api
         else:
             self.robot = context.robot_api_factory.build(self.target.robot_id)
 
@@ -977,7 +975,7 @@ class NodeFromStepBuilder:
             ),
             label=step.label,
         )
-        expr = f"pose = getValue('pose'); pose and pose.frameId == '{waypoint.frame_id}' and sqrt(pow(pose.x-{waypoint.x}, 2) + pow(pose.y-{waypoint.y}, 2)) < {self.waypoint_distance_tolerance} and abs((pose.theta-{waypoint.theta})%(2*{math.pi})) < {self.waypoint_angular_tolerance}"
+        expr = f"pose = getValue('pose'); theta = pose.theta; pose and pose.frameId == '{waypoint.frame_id}' and sqrt(pow(pose.x-{waypoint.x}, 2) + pow(pose.y-{waypoint.y}, 2)) < {self.waypoint_distance_tolerance} and abs(angularDistance(theta, {waypoint.theta})) < {self.waypoint_angular_tolerance}"
         wait_node = WaitExpressionNode(
             self.context,
             expr,
@@ -1110,10 +1108,6 @@ register_accepted_node_types(accepted_node_types)
 
 
 def build_tree_from_object(context: BehaviorTreeBuilderContext, object: dict):
-    # print("build_tree_from_object():")
-    # if object:
-    #     print(object["type"], " keys ->", object.keys())
-
     node_type = object["type"] if object else None
     if node_type not in tree_node_class_map:
         traceback.print_stack(file=sys.stdout)
@@ -1121,11 +1115,82 @@ def build_tree_from_object(context: BehaviorTreeBuilderContext, object: dict):
 
     clazz = tree_node_class_map[node_type]
     del object["type"]
-    # print("About to call from_object", clazz, object)
     node = clazz.from_object(context=context, **object)
     return node
 
 
 class TreeBuilder:
-    def build_tree_for_mission(self, context: BehaviorTreeBuilderContext):
+    def build_tree_for_mission(self, context: BehaviorTreeBuilderContext) -> BehaviorTree:
         raise Exception("Implemented by subclass")
+
+class DefaultTreeBuilder(TreeBuilder):
+    """Default tree builder for the edge executor that uses the behavior tree nodes provided in
+    this package"""
+    def build_tree_for_mission(self, context: BehaviorTreeBuilderContext) -> BehaviorTree:
+        mission = context.mission
+        tree = BehaviorTreeSequential(label=f"mission {mission.id}")
+        tree.add_node(MissionInProgressNode(context, label="mission start"))
+        step_builder = NodeFromStepBuilder(context)
+
+        for step, ix in zip(mission.definition.steps, range(len(mission.definition.steps))):
+            # TODO build the right kind of behavior node
+            try:
+                node = step.accept(step_builder)
+            except Exception as e:  # TODO
+                raise Exception(f"Error building step #{ix} [{step}]: {str(e)}")
+            # Before every step, keep robot locked
+            tree.add_node(LockRobotNode(context, label="lock robot"))
+            if step.timeout_secs is not None and type(node) not in (WaitNode, TimeoutNode):
+                node = TimeoutNode(
+                    step.timeout_secs, node, label=f"timeout for {step.label}"
+                )
+            if step.complete_task is not None:
+                tree.add_node(
+                    TaskStartedNode(
+                        context,
+                        step.complete_task,
+                        label=f"report task {step.complete_task} started",
+                    )
+                )
+            if node:
+                tree.add_node(node)
+            if step.complete_task is not None:
+                tree.add_node(
+                    TaskCompletedNode(
+                        context,
+                        step.complete_task,
+                        label=f"report task {step.complete_task} completed",
+                    )
+                )
+
+        tree.add_node(MissionCompletedNode(context, label="mission completed"))
+        tree.add_node(
+            UnlockRobotNode(context, label="unlock robot after mission completed")
+        )
+        # add error handlers
+        on_error = BehaviorTreeSequential(label="error handlers")
+        on_error.add_node(
+            MissionAbortedNode(context, status=MissionStatus.error, label="mission aborted")
+        )
+        on_error.add_node(
+            UnlockRobotNode(context, label="unlock robot after mission abort")
+        )
+        on_cancel = BehaviorTreeSequential(label="cancel handlers")
+        on_cancel.add_node(
+            MissionAbortedNode(context, status=MissionStatus.ok, label="mission cancelled")
+        )
+        on_cancel.add_node(
+            UnlockRobotNode(context, label="unlock robot after mission cancel")
+        )
+        on_pause = BehaviorTreeSequential(label="pause handlers")
+        on_pause.add_node(MissionPausedNode(context, label="mission paused"))
+        tree = BehaviorTreeErrorHandler(
+            context,
+            tree,
+            on_error,
+            on_cancel,
+            on_pause,
+            context.error_context,
+            label=tree.label,
+        )
+        return tree
