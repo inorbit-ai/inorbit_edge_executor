@@ -10,6 +10,7 @@ readme = "README.md"
 authors = [
     { name = "Mariano Cereda", email = "mariano.cereda@inorbit.ai" },
     { name = "Hernan Badenes", email = "herchu@inorbit.ai" },
+    { name = "Miguel Garcia", email = "mike@inorbit.ai" },
 ]
 
 dependencies = [
