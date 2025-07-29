@@ -46,11 +46,11 @@ class DummyDB(WorkerPersistenceDB):
             delete = [robot_id for robot_id in self._busy_robots if self._busy_robots[robot_id] == mission_id]
             for robot_id in delete:
                 del self._busy_robots[robot_id]
-        except:
+        except Exception:
             logger.error("error deleting missions", exc_info=True)
         try:
             del self._missions[mission_id]
-        except:
+        except Exception:
             logger.error("error deleting mission", exc_info=True)
 
     async def delete_finished_missions(self):
