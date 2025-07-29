@@ -17,9 +17,6 @@ from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
 
-# FIXME(herchu) Remove Bluebotics dependency
-# from missions.datatypes import MissionStepCreateBlueBoticsMission
-
 class MissionTrackingTypes(Enum):
     API = "api"
     DATASOURCE = "datasource"
@@ -42,15 +39,11 @@ class Pose(BaseModel):
     Waypoint to be used for MissionStepPoseWaypoint
     """
 
-    class WaypointProperties(BaseModel):
-        waypointKind: str = Field(alias="x-bluebotics-waypoint-kind", default=None)
-
     x: float
     y: float
     theta: float
     frame_id: Optional[str] = Field(alias="frameId", default=None)
     waypointId: str = Field(alias="waypointId", default=None)
-    properties: Optional[WaypointProperties] = Field(default=None)
 
 
 class MissionStep(BaseModel):
@@ -98,7 +91,7 @@ class MissionStepSetData(MissionStep):
     Mission step for adding metadata to a mission
     """
 
-    data: Dict[str, Union[str, int, float, bool]]
+    data: Dict[str, Union[str, int, float, bool, dict]]
 
     def accept(self, visitor):
         return visitor.visit_set_data(self)
@@ -118,6 +111,9 @@ class MissionStepPoseWaypoint(MissionStep):
 
     def get_type(self):
         return MissionStepTypes.POSE_WAYPOINT.value
+
+    def accept(self, visitor):
+        return visitor.visit_pose_waypoint(self)
 
 
 class MissionStepWaitUntil(MissionStep):
@@ -179,6 +175,9 @@ class MissionStepRunAction(MissionStep):
 
     def get_type(self):
         return MissionStepTypes.RUN_ACTION.value
+
+    def accept(self, visitor):
+        return visitor.visit_run_action(self)
 
 
 class MissionDefinition(BaseModel):

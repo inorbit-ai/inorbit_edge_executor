@@ -2,6 +2,17 @@
 
 This package allows to execute InOrbit missions in connector robots.
 
+## Version >=3.0.0 disclaimer
+
+Note that version 3.0.0 introduces some breaking changes compared to 2.0.0.
+
+* Removed `MissionTrackingDatasource` (to be re-implemented as an optional dependency in a future
+version).
+* A new `DefaultTreeBuilder` that can be used to build behavior trees from mission definitions
+with the behavior nodes included in this package.
+
+In exchange `3.0.0` provides several fixes and feature parity with InOrbit's cloud executor.
+
 ## Installation
 
 **Stable Release:** `pip install inorbit_edge_executor`<br>

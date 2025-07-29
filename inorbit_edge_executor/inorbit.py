@@ -11,8 +11,6 @@ from .datatypes import Robot
 from .mission import Mission
 from .mission import MissionTask
 from .logger import setup_logger
-from inorbit_edge.robot import RobotSessionFactory
-from inorbit_edge.robot import RobotSessionPool
 from functools import wraps
 
 logger = setup_logger("EdgeExecutor.InOrbit")
@@ -29,10 +27,10 @@ def with_robot_session(func):
         except Exception as e:
             logger.error(f"Error getting robot session {e}")
             return False
-        
+
         # Inject robot_session as keyword argument
         return await func(self, *args, robot_session=robot_session, **kwargs)
-    
+
     return wrapper
 
 
@@ -131,16 +129,20 @@ def build_expression_eval_api_path(robot_id):
 
 
 class InOrbitAPI:
+    HTTP_PEER_KEY_HEADER = "x-auth-inorbit-peer-key"
     HTTP_API_KEY_HEADER = "x-auth-inorbit-app-key"
 
-    def __init__(self, base_url="https://api.inorbit.ai", api_key=None):
+    def __init__(self, base_url="https://api.inorbit.ai", api_key=None, peer_key=None):
         logger.info("InOrbit API: " + base_url)
         self._base_url = base_url
         self._api_key = api_key
+        self._peer_key = peer_key
 
     @property
     def headers(self):
         headers = {}
+        if self._peer_key:
+            headers[InOrbitAPI.HTTP_PEER_KEY_HEADER] = self._peer_key
         if self._api_key:
             headers[InOrbitAPI.HTTP_API_KEY_HEADER] = self._api_key
         return headers
@@ -178,6 +180,14 @@ class MissionTrackingMission:
     @property
     def robot_id(self):
         return self._mission.robot_id
+
+    @property
+    def arguments(self):
+        return self._mission.arguments
+    
+    @property
+    def definition(self):
+        return self._mission.definition
 
     async def start(self, is_resume=False):
         raise NotImplementedError(
@@ -226,14 +236,14 @@ class MissionTrackingMission:
 
     def _build_tasks_list(self):
         return [t.model_dump(mode="json", by_alias=True) for t in self._mission.tasks_list]
-    
+
     async def resolve_arguments(self, arguments):
         return await MissionDataResolver(arguments, self._mission, self).resolve()
 
 class MissionTrackingAPI(MissionTrackingMission):
     """
     This class is used to send updates to the Mission Tracking API through the
-    InOrbit API. 
+    InOrbit API.
     """
 
     def __init__(self, mission: Mission, api: InOrbitAPI):
@@ -377,168 +387,6 @@ class MissionTrackingAPI(MissionTrackingMission):
             logger.warning(f"Error sending mission data to mission-tracking {e}")
             return False
 
-class MissionTrackingDatasource(MissionTrackingMission):
-    """
-    This class is used to send updates to the Mission Tracking API through the
-    InOrbit datasources. 
-    """
-
-    def __init__(self, mission: Mission, robot_session_pool: RobotSessionPool):
-        super().__init__(mission)
-        self._robot_session_pool = robot_session_pool
-
-    @property
-    def id(self):
-        return self._id
-
-    @property
-    def robot_id(self):
-        return self._mission.robot_id
-    
-    def _publish_kv(self, key_values, robot_session=None) -> None:
-        """
-        Publishes key values to the robot session.
-
-        :param key_values: Key values to publish
-        :param robot_session: Robot session to use for publishing the key values.
-        """
-        try:
-            # TODO: Make the key configurable.
-            robot_session.publish_key_values({"mission_tracking": key_values}, is_event=True)
-        except Exception as e:
-            logger.error(f"Error publishing key values {e}")
-    
-    def _find_current_task_id(self) -> str | None:
-        """
-        Finds the id of the current task.
-
-        :return: The id of the current task
-        """
-        current_task: MissionTask = next(
-            (task for task in self._mission.tasks_list if not task.completed), None
-        )
-        return current_task.task_id if current_task else None
-    
-    @with_robot_session
-    async def start(self, is_resume=False, robot_session=None) -> None:
-        """
-        Marks the mission as started in Mission Tracking API
-
-        :param is_resume: True if the mission was paused and its execution is being resumed
-        :param robot_session: Robot session to use for publishing the key values
-        :return: None
-        """       
-        mt_key_values = {
-            "missionId": self._mission.id,
-            "inProgress": True,
-            "state": str(MissionState.starting)
-        }
-
-        if not is_resume:
-            mt_key_values["startTs"] = current_timestamp_ms()
-        if self._mission.arguments:
-            mt_key_values["arguments"] = self._mission.arguments
-
-        self._publish_kv(mt_key_values, robot_session=robot_session)
-        
-    @with_robot_session
-    async def mark_in_progress(self, robot_session=None) -> None:
-        """
-        Marks the mission as in progress in Mission Tracking API
-        
-        :param robot_session: Robot session to use for publishing the key values
-        :return: None
-        """
-        mt_key_values = {
-            "missionId": self._mission.id,
-            "inProgress": True,
-            "state": str(MissionState.in_progress)
-        }
-
-        self._publish_kv(mt_key_values, robot_session=robot_session)
-
-    async def report_tasks(self, robot_session=None) -> None:
-        """
-        Updates the "tasks" list of the mission in Mission Tracking.
-        :param robot_session: Robot session to use for publishing the key values
-        :return: None
-        """
-        mt_key_values = {
-            "missionId": self._mission.id,
-            "tasks": self._build_tasks_list()
-        }
-
-        current_task_id = self._find_current_task_id()
-        if current_task_id:
-            mt_key_values["currentTaskId"] = current_task_id
-
-        self._publish_kv(mt_key_values, robot_session=robot_session)
-
-    @with_robot_session
-    async def pause(self, robot_session=None) -> None:
-        """
-        Marks the mission as paused in Mission Tracking API
-
-        :param robot_session: Robot session to use for publishing the key values
-        :return: None
-        """
-        mt_key_values = {
-            "missionId": self._mission.id,
-            "state": str(MissionState.paused),
-            "tasks": self._build_tasks_list()
-        }
-
-        self._publish_kv(mt_key_values, robot_session=robot_session)
-    
-    @with_robot_session
-    async def completed(self, robot_session=None) -> None:
-        """
-        Marks the mission as completed in Mission Tracking API.
-
-        :param robot_session: Robot session to use for publishing the key values
-        :return: None
-        """
-        mt_key_values = {
-            "missionId": self._mission.id,
-            "inProgress": False,
-            "state": str(MissionState.completed)
-        }
-
-        self._publish_kv(mt_key_values, robot_session=robot_session)
-        
-    @with_robot_session
-    async def abort(self, status: MissionStatus = MissionStatus.error, robot_session=None) -> None:
-        """
-        Marks the mission as aborted in Mission Tracking API.
-
-        :param robot_session: Robot session to use for publishing the key values
-        :return: None
-        """
-        mt_key_values = {
-            "missionId": self._mission.id,
-            "inProgress": False,
-            "state": str(MissionState.abandoned),
-            "status": "error"
-        }
-
-        self._publish_kv(mt_key_values, robot_session=robot_session)
-
-    @with_robot_session    
-    async def add_data(self, data:dict, robot_session=None) -> None:
-        """
-        Adds keys to the "data" field of a mission in Mission Tracking.
-
-        :param data: Data to add to the mission
-        :param robot_session: Robot session to use for publishing the key values.
-        :return: None
-        """
-        mt_key_values = {
-            "missionId": self._mission.id,
-            "data": data
-        }
-
-        self._publish_kv(mt_key_values, robot_session=robot_session)
-
 class MissionDataResolver:
     """
     This object "resolves" any operator field in a data object, e.g. { _data: "key" } or
@@ -660,13 +508,13 @@ class MissionDataResolver:
 class RobotApi:
     """Wrapper for Robot APIs"""
 
-    def __init__(self, robot_id: Robot, api: InOrbitAPI):
-        self._robot_id = robot_id
+    def __init__(self, robot: Robot, api: InOrbitAPI):
+        self._robot = robot
         self._api = api
 
     @property
     def robot_id(self):
-        return self._robot_id
+        return self._robot.id
 
     async def execute_action(self, action_id: str, arguments):
         req = {"actionId": action_id, "parameters": arguments if arguments is not None else {}}
@@ -790,8 +638,4 @@ class InOrbitRobotSessionFactory:
     """
 
     def __init__(self, config:dict):
-        self._config:dict = config
-        self._robot_session_factory = RobotSessionFactory(**self._config)
-
-    def build(self):
-        return RobotSessionPool(self._robot_session_factory)
+        raise NotImplementedError("InOrbitRobotSessionFactory is not implemented")

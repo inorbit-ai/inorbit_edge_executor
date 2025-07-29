@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "inorbit_edge_executor"
-version = "2.0.0"
+version = "3.0.0"
 description = "InOrbit Edge Missions Executor"
 readme = "README.md"
 authors = [
@@ -28,7 +28,6 @@ dependencies = [
     "idna==3.4",
     "itsdangerous==2.1.2",
     "MarkupSafe==2.1.1",
-    "pycodestyle==2.10.0",
     "pydantic",
     "pytest",
     "python-dotenv==0.21.0",
@@ -37,7 +36,6 @@ dependencies = [
     "tomli==2.0.1",
     "typing-extensions==4.7.1",
     "urllib3==1.26.13",
-    "pytest==7.4.0",
     "pytest-httpx==0.22.0",
     "pytest-asyncio==0.21.1",
     "aiosql==9.0",
@@ -51,9 +49,24 @@ requires-python = ">=3.10"
 
 [project.optional-dependencies]
 dev = [
-    "pytest", "black", "tox", "bump2version~=1.0", "black~=24.3", "coverage~=7.4", "flake8~=7.0",
-    "flake8-pyproject~=1.2", "pip~=24.0", "pytest~=8.1", "pytest-mock~=3.14", "requests-mock~=1.12",
-    "setuptools~=68.2", "tox~=4.14", "twine~=5.0", "wheel~=0.43"
+    "pytest",
+    "black",
+    "tox",
+    "bump2version~=1.0",
+    "black~=24.3",
+    "coverage~=7.4",
+    "flake8~=7.0",
+    "flake8-pyproject~=1.2",
+    "pycodestyle>=2.10.0",
+    "pip~=24.0",
+    "pytest==7.4.0",
+    "pytest-mock~=3.14",
+    "requests-mock~=1.12",
+    "setuptools~=68.2",
+    "tox~=4.14",
+    "twine~=5.0",
+    "wheel~=0.43",
+    "pytest-watch>=4.2.0",
 ]
 docs = ["sphinx", "mkdocs"]
 
