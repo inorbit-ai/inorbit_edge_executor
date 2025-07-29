@@ -16,7 +16,6 @@ dependencies = [
     "numpy>=1.21",
     "requests",
     "python-dotenv",
-    "inorbit-edge>=1.16.2",
     "pytz>=2022.7",
     "pyyaml",
     "uuid",
