@@ -17,8 +17,6 @@ TODOs in this file:
  - Correctly resume timeout/wait nodes, taking into account the time left
  - For Action nodes, read API response and fail if the action was not executed. (Even better: wait
    for completion if the state is 'running')
- - Implement pause/repeat/etc to control execution of a mission. We may need to change the way
-   they are implemented (instead of a single task, have tasks be only 1 node?)
 """
 import asyncio
 import math
@@ -1117,19 +1115,18 @@ def build_tree_from_object(context: BehaviorTreeBuilderContext, object: dict):
 
     clazz = tree_node_class_map[node_type]
     del object["type"]
-    # print("About to call from_object", clazz, object)
     node = clazz.from_object(context=context, **object)
     return node
 
 
 class TreeBuilder:
-    def build_tree_for_mission(self, context: BehaviorTreeBuilderContext):
+    def build_tree_for_mission(self, context: BehaviorTreeBuilderContext) -> BehaviorTree:
         raise Exception("Implemented by subclass")
 
 class DefaultTreeBuilder(TreeBuilder):
     """Default tree builder for the edge executor that uses the behavior tree nodes provided in
     this package"""
-    def build_tree_for_mission(self, context: BehaviorTreeBuilderContext):
+    def build_tree_for_mission(self, context: BehaviorTreeBuilderContext) -> BehaviorTree:
         mission = context.mission
         tree = BehaviorTreeSequential(label=f"mission {mission.id}")
         tree.add_node(MissionInProgressNode(context, label="mission start"))

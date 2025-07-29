@@ -6,36 +6,31 @@ execution.
 """
 import asyncio
 
-from .behavior_tree import BehaviorTreeBuilderContext
-from .behavior_tree import BehaviorTreeErrorHandler
-from .behavior_tree import BehaviorTreeSequential
-from .behavior_tree import build_tree_from_object
-from .behavior_tree import LockRobotNode
-from .behavior_tree import MissionAbortedNode
-from .behavior_tree import MissionCompletedNode
-from .behavior_tree import MissionPausedNode
-from .behavior_tree import MissionStartNode
-from .behavior_tree import NodeFromStepBuilder
-from .behavior_tree import TaskCompletedNode
-from .behavior_tree import TaskStartedNode
-from .behavior_tree import TimeoutNode
-from .behavior_tree import UnlockRobotNode
-from .behavior_tree import WaitNode
-from .datatypes import MissionRuntimeOptions
-from .datatypes import MissionRuntimeSharedMemory
-from .datatypes import MissionWorkerState
+from .behavior_tree import (
+    BehaviorTreeBuilderContext,
+    BehaviorTreeErrorHandler,
+    BehaviorTreeSequential,
+    build_tree_from_object,
+    LockRobotNode,
+    MissionAbortedNode,
+    MissionCompletedNode,
+    MissionPausedNode,
+    MissionStartNode,
+    NodeFromStepBuilder,
+    TaskCompletedNode,
+    TaskStartedNode,
+    TimeoutNode,
+    UnlockRobotNode,
+    WaitNode
+)
+from .datatypes import (MissionRuntimeOptions, MissionRuntimeSharedMemory, MissionWorkerState,
+    MissionTrackingTypes)
 from .db import WorkerPersistenceDB
-from .exceptions import RobotBusyException
-from .exceptions import TranslationException
-from .inorbit import InOrbitAPI
-from .inorbit import MissionStatus
-from .inorbit import MissionTrackingAPI
-from .inorbit import RobotApiFactory
-from .inorbit import InOrbitRobotSessionFactory
+from .exceptions import RobotBusyException, TranslationException
+from .inorbit import InOrbitAPI, MissionStatus, MissionTrackingAPI, RobotApiFactory
 from .logger import setup_logger
 from .mission import Mission
 from .worker import Worker
-from .datatypes import MissionTrackingTypes
 
 logger = setup_logger(name="WorkerPool")
 
@@ -292,20 +287,6 @@ class WorkerPool:
         """
         if mission_id in self._workers:
             ret = {"id": mission_id}
-            # Get the bluebotics Mission ID linked to the inorbit mission id
-            # TODO(herchu) Reimplement this, based on
-            # - de-serializing mission , and cancel()ing it
-            # - letting the behavior tree error handlers (not added yet!) to cancel mission on
-            #   bluebotics
-            # - if there's no worker for mission_id, attempt to find the bluebotics mission id
-            #   anyuway from the last executed step?
-            # bluebotics_mission_id = await self._db.get_bluebotics_mission_id(mission_id)
-            # if bluebotics_mission_id:
-            #   cancelled =
-            # await self._bluebotics_api_client.cancel_mission(bluebotics_mission_id)
-            #     if cancelled:
-            #         ret["cancelled"] = self._workers[mission_id].cancel()
-            #         return ret
         return False
 
     async def get_mission_status(self, mission_id):
