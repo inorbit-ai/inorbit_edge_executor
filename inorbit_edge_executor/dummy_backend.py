@@ -27,7 +27,7 @@ class DummyDB(WorkerPersistenceDB):
         if mission.finished:
             try:
                 del self._busy_robots[mission.robot_id]
-            except:
+            except Exception:
                 logger.error("error deleting mission", exc_info=True)
         else:
             self._busy_robots[mission.robot_id] = mission.mission_id
