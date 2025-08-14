@@ -1126,11 +1126,14 @@ class TreeBuilder:
 class DefaultTreeBuilder(TreeBuilder):
     """Default tree builder for the edge executor that uses the behavior tree nodes provided in
     this package"""
+    def __init__(self, step_builder_factory: NodeFromStepBuilder = None):
+        self._step_builder_factory = step_builder_factory if step_builder_factory else NodeFromStepBuilder
+
     def build_tree_for_mission(self, context: BehaviorTreeBuilderContext) -> BehaviorTree:
         mission = context.mission
         tree = BehaviorTreeSequential(label=f"mission {mission.id}")
         tree.add_node(MissionInProgressNode(context, label="mission start"))
-        step_builder = NodeFromStepBuilder(context)
+        step_builder = self._step_builder_factory(context)
 
         for step, ix in zip(mission.definition.steps, range(len(mission.definition.steps))):
             # TODO build the right kind of behavior node
