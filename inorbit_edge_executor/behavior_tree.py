@@ -1126,7 +1126,8 @@ class TreeBuilder:
 class DefaultTreeBuilder(TreeBuilder):
     """Default tree builder for the edge executor that uses the behavior tree nodes provided in
     this package"""
-    def __init__(self, step_builder_factory: NodeFromStepBuilder = None):
+    def __init__(self, step_builder_factory: NodeFromStepBuilder = None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self._step_builder_factory = step_builder_factory if step_builder_factory else NodeFromStepBuilder
 
     def build_tree_for_mission(self, context: BehaviorTreeBuilderContext) -> BehaviorTree:
