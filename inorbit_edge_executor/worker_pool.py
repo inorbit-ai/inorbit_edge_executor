@@ -8,20 +8,9 @@ import asyncio
 
 from .behavior_tree import (
     BehaviorTreeBuilderContext,
-    BehaviorTreeErrorHandler,
-    BehaviorTreeSequential,
+    TreeBuilder,
+    DefaultTreeBuilder,
     build_tree_from_object,
-    LockRobotNode,
-    MissionAbortedNode,
-    MissionCompletedNode,
-    MissionPausedNode,
-    MissionStartNode,
-    NodeFromStepBuilder,
-    TaskCompletedNode,
-    TaskStartedNode,
-    TimeoutNode,
-    UnlockRobotNode,
-    WaitNode
 )
 from .datatypes import (MissionRuntimeOptions, MissionRuntimeSharedMemory, MissionWorkerState,
     MissionTrackingTypes)
@@ -55,7 +44,8 @@ class WorkerPool:
        Normally, only the definition part of the mission would be changed.
     """
 
-    def __init__(self, api: InOrbitAPI, db: WorkerPersistenceDB, mt_type: MissionTrackingTypes = None, robot_session_config:dict = None):
+    def __init__(self, api: InOrbitAPI, db: WorkerPersistenceDB, mt_type: MissionTrackingTypes = None,
+        robot_session_config: dict = None, behavior_tree_builder: TreeBuilder = None):
         if not api:
             raise Exception("Missing InOrbitAPI for WorkerPool initialization")
         self._api = api
@@ -70,6 +60,7 @@ class WorkerPool:
         self._running = False
         # Lock to protect workers pool state
         self._mutex = asyncio.Lock()
+        self._behavior_tree_builder = behavior_tree_builder if behavior_tree_builder else DefaultTreeBuilder()
 
     async def start(self):
         """
@@ -245,9 +236,8 @@ class WorkerPool:
         # Create worker, not yet started (it can still be discarded)
         worker = Worker(mission, options, shared_memory)
         try:
-            print("Building BehaviorTree...")
-            worker.set_behavior_tree(self.build_tree_for_mission(context))
-            print("Finished building BehaviorTree.")
+            bt = self._behavior_tree_builder.build_tree_for_mission(context)
+            worker.set_behavior_tree(bt)
         except Exception as e:
             logger.error(f"Error compiling mission tree: {e}", exc_info=True)
             return {"error": str(e)}
@@ -300,58 +290,3 @@ class WorkerPool:
                 return self._workers[mission_id].dump_object()
             else:
                 return None
-
-    def build_tree_for_mission(self, context: BehaviorTreeBuilderContext):
-        mission = context.mission
-        tree = BehaviorTreeSequential(label=f"mission {mission.id}")
-        tree.add_node(MissionStartNode(context, label="mission start"))
-        step_builder = NodeFromStepBuilder(context)
-
-        for step, ix in zip(mission.definition.steps, range(len(mission.definition.steps))):
-            # TODO build the right kind of behavior node
-            try:
-                node = step.accept(step_builder)
-            except Exception as e:  # TODO
-                raise Exception(f"Error building step #{ix} [{step}]: {str(e)}")
-            # Before every step, keep robot locked
-            tree.add_node(LockRobotNode(context, label="lock robot"))
-            if step.timeout_secs is not None and type(node) != WaitNode:
-                node = TimeoutNode(step.timeout_secs, node, label=f"timeout for {step.label}")
-            if step.complete_task is not None:
-                tree.add_node(
-                    TaskStartedNode(
-                        context,
-                        step.complete_task,
-                        label=f"report task {step.complete_task} started",
-                    )
-                )
-            if node:
-                tree.add_node(node)
-            if step.complete_task is not None:
-                tree.add_node(
-                    TaskCompletedNode(
-                        context,
-                        step.complete_task,
-                        label=f"report task {step.complete_task} completed",
-                    )
-                )
-
-        tree.add_node(MissionCompletedNode(context, label="mission completed"))
-        tree.add_node(UnlockRobotNode(context, label="unlock robot after mission completed"))
-        # add error handlers
-        on_error = BehaviorTreeSequential(label="error handlers")
-        on_error.add_node(
-            MissionAbortedNode(context, status=MissionStatus.error, label="mission aborted")
-        )
-        on_error.add_node(UnlockRobotNode(context, label="unlock robot after mission abort"))
-        on_cancel = BehaviorTreeSequential(label="cancel handlers")
-        on_cancel.add_node(
-            MissionAbortedNode(context, status=MissionStatus.ok, label="mission cancelled")
-        )
-        on_cancel.add_node(UnlockRobotNode(context, label="unlock robot after mission cancel"))
-        on_pause = BehaviorTreeSequential(label="pause handlers")
-        on_pause.add_node(MissionPausedNode(context, label="mission paused"))
-        tree = BehaviorTreeErrorHandler(
-            context, tree, on_error, on_cancel, on_pause, context.error_context, label=tree.label
-        )
-        return tree
