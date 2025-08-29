@@ -12,11 +12,18 @@ authors = [
     { name = "Hernan Badenes", email = "herchu@inorbit.ai" },
     { name = "Miguel Garcia", email = "mike@inorbit.ai" },
 ]
-
+license = { text = "MIT" }
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+requires-python = ">=3.10"
 dependencies = [
     "numpy>=1.21",
     "requests",
     "python-dotenv",
+    "inorbit-edge>=1.16.2",
     "pytz>=2022.7",
     "pyyaml",
     "uuid",
@@ -28,6 +35,7 @@ dependencies = [
     "idna==3.4",
     "itsdangerous==2.1.2",
     "MarkupSafe==2.1.1",
+    "pycodestyle==2.10.0",
     "pydantic",
     "pytest",
     "python-dotenv==0.21.0",
@@ -36,6 +44,7 @@ dependencies = [
     "tomli==2.0.1",
     "typing-extensions==4.7.1",
     "urllib3==1.26.13",
+    "pytest==7.4.0",
     "pytest-httpx==0.22.0",
     "pytest-asyncio==0.21.1",
     "aiosql==9.0",
@@ -45,33 +54,14 @@ dependencies = [
     "pydantic-yaml",
 ]
 
-requires-python = ">=3.10"
-
 [project.optional-dependencies]
 dev = [
-    "pytest",
-    "black",
-    "tox",
-    "bump2version~=1.0",
-    "black~=24.3",
-    "coverage~=7.4",
-    "flake8~=7.0",
-    "flake8-pyproject~=1.2",
-    "pycodestyle>=2.10.0",
-    "pip~=24.0",
-    "pytest==7.4.0",
-    "pytest-mock~=3.14",
-    "requests-mock~=1.12",
-    "setuptools~=68.2",
-    "tox~=4.14",
-    "twine~=5.0",
-    "wheel~=0.43",
-    "pytest-watch>=4.2.0",
 ]
 docs = ["sphinx", "mkdocs"]
 
 [tool.setuptools]
 packages = ["inorbit_edge_executor"]
+include-package-data = true
 
 [tool.black]
 target-version = ['py310']
