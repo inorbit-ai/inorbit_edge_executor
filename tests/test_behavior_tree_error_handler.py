@@ -14,15 +14,20 @@ from inorbit_edge_executor.behavior_tree import (
 
 SHORT_SLEEP_TIME = 0.05
 
+
 class BadNode(BehaviorTree):
     """A simple node that raises an exception"""
+
     async def _execute(self):
         raise Exception("Bad node")
-    
+
+
 class SlowNode(BehaviorTree):
     """A simple node that takes a long time to execute"""
+
     async def _execute(self):
         await asyncio.sleep(SHORT_SLEEP_TIME)
+
 
 @pytest.mark.asyncio
 async def test_error_handler_invoked_on_error():
@@ -52,8 +57,9 @@ async def test_cancel_handler_invoked_on_cancelled():
     await asyncio.sleep(SHORT_SLEEP_TIME)
     task.cancel()
     await task
-    assert node.state == NODE_STATE_SUCCESS # Set by the cancel handler
+    assert node.state == NODE_STATE_SUCCESS  # Set by the cancel handler
     assert cancel_handler.already_executed()
+
 
 @pytest.mark.asyncio
 async def test_cancel_handler_is_optional():
@@ -68,6 +74,7 @@ async def test_cancel_handler_is_optional():
     task.cancel()
     await task
     assert node.state == NODE_STATE_CANCELLED
+
 
 @pytest.mark.asyncio
 async def test_pause_handler_invoked_on_paused():
@@ -90,6 +97,7 @@ async def test_pause_handler_invoked_on_paused():
     assert behavior_tree.state == NODE_STATE_PAUSED
     assert pause_handler.already_executed()
 
+
 @pytest.mark.asyncio
 async def test_pause_can_reset_execution():
     pause_handler = DummyNode()
@@ -111,6 +119,7 @@ async def test_pause_can_reset_execution():
         pass
     assert behavior_tree.state == ""
 
+
 def test_serialize():
     node = BehaviorTreeErrorHandler(
         context=None,
@@ -125,32 +134,18 @@ def test_serialize():
     assert serialized["cancelled_handler"]["label"] == "cancelled_handler"
     assert serialized["pause_handler"]["label"] == "pause_handler"
 
+
 def test_deserialize(empty_context: BehaviorTreeBuilderContext):
     serialized = {
-        "children": [{
-            "type": "DummyNode",
-            "state": "",
-            "label": "behavior_tree"
-        }],
-        "error_handler": {
-            "type": "DummyNode",
-            "state": "",
-            "label": "error_handler"
-        },
-        "cancelled_handler": {
-            "type": "DummyNode",
-            "state": "",
-            "label": "cancelled_handler"
-        },
-        "pause_handler": {
-            "type": "DummyNode",
-            "state": "",
-            "label": "pause_handler"
-        },
-        "reset_execution_on_pause": True
+        "children": [{"type": "DummyNode", "state": "", "label": "behavior_tree"}],
+        "error_handler": {"type": "DummyNode", "state": "", "label": "error_handler"},
+        "cancelled_handler": {"type": "DummyNode", "state": "", "label": "cancelled_handler"},
+        "pause_handler": {"type": "DummyNode", "state": "", "label": "pause_handler"},
+        "reset_execution_on_pause": True,
     }
     node = BehaviorTreeErrorHandler.from_object(empty_context, **serialized)
     assert node.behavior.label == "behavior_tree"
+
 
 def test_collect_nodes():
     node = BehaviorTreeErrorHandler(

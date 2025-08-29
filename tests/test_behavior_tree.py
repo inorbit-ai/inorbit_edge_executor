@@ -1,7 +1,11 @@
 from logging import getLogger
 
 import pytest
-from inorbit_edge_executor.behavior_tree import BehaviorTree, DefaultTreeBuilder, BehaviorTreeBuilderContext
+from inorbit_edge_executor.behavior_tree import (
+    BehaviorTree,
+    DefaultTreeBuilder,
+    BehaviorTreeBuilderContext,
+)
 from inorbit_edge_executor.datatypes import MissionDefinition
 from inorbit_edge_executor.datatypes import MissionRuntimeOptions
 from inorbit_edge_executor.datatypes import MissionRuntimeSharedMemory
@@ -35,82 +39,68 @@ def test_bt_build_simple(inorbit_api):
     tree: BehaviorTree = DefaultTreeBuilder().build_tree_for_mission(context)
     logger.info(tree.dump_object())
     expected_obj = {
-        'type': 'BehaviorTreeErrorHandler',
-        'state': '',
-        'label': 'mission mission123',
-        'children': [
+        "type": "BehaviorTreeErrorHandler",
+        "state": "",
+        "label": "mission mission123",
+        "children": [
             {
-                'type': 'BehaviorTreeSequential',
-                'state': '',
-                'label': 'mission mission123',
-                'children': [
+                "type": "BehaviorTreeSequential",
+                "state": "",
+                "label": "mission mission123",
+                "children": [
+                    {"type": "MissionInProgressNode", "state": "", "label": "mission start"},
+                    {"type": "MissionCompletedNode", "state": "", "label": "mission completed"},
                     {
-                        'type': 'MissionInProgressNode',
-                        'state': '',
-                        'label': 'mission start'
+                        "type": "UnlockRobotNode",
+                        "state": "",
+                        "label": "unlock robot after mission completed",
                     },
-                    {
-                        'type': 'MissionCompletedNode',
-                        'state': '',
-                        'label': 'mission completed'
-                    },
-                    {
-                        'type': 'UnlockRobotNode',
-                        'state': '',
-                        'label': 'unlock robot after mission completed'
-                    }
-                ]
+                ],
             }
         ],
-        'error_handler': {
-            'type': 'BehaviorTreeSequential',
-            'state': '',
-            'label': 'error handlers',
-            'children': [
+        "error_handler": {
+            "type": "BehaviorTreeSequential",
+            "state": "",
+            "label": "error handlers",
+            "children": [
                 {
-                    'type': 'MissionAbortedNode',
-                    'state': '',
-                    'label': 'mission aborted',
-                    'status': 'error'
+                    "type": "MissionAbortedNode",
+                    "state": "",
+                    "label": "mission aborted",
+                    "status": "error",
                 },
                 {
-                    'type': 'UnlockRobotNode',
-                    'state': '',
-                    'label': 'unlock robot after mission abort'
-                }
-            ]
+                    "type": "UnlockRobotNode",
+                    "state": "",
+                    "label": "unlock robot after mission abort",
+                },
+            ],
         },
-        'cancelled_handler': {
-            'type': 'BehaviorTreeSequential',
-            'state': '',
-            'label': 'cancel handlers',
-            'children': [
+        "cancelled_handler": {
+            "type": "BehaviorTreeSequential",
+            "state": "",
+            "label": "cancel handlers",
+            "children": [
                 {
-                    'type': 'MissionAbortedNode',
-                    'state': '',
-                    'label': 'mission cancelled',
-                    'status': 'OK'
+                    "type": "MissionAbortedNode",
+                    "state": "",
+                    "label": "mission cancelled",
+                    "status": "OK",
                 },
                 {
-                    'type': 'UnlockRobotNode',
-                    'state': '',
-                    'label': 'unlock robot after mission cancel'
-                }
-            ]
+                    "type": "UnlockRobotNode",
+                    "state": "",
+                    "label": "unlock robot after mission cancel",
+                },
+            ],
         },
-        'pause_handler': {
-            'type': 'BehaviorTreeSequential',
-            'state': '',
-            'label': 'pause handlers',
-            'children': [
-                {
-                    'type': 'MissionPausedNode',
-                    'state': '',
-                    'label': 'mission paused'
-                }
-            ]
+        "pause_handler": {
+            "type": "BehaviorTreeSequential",
+            "state": "",
+            "label": "pause handlers",
+            "children": [{"type": "MissionPausedNode", "state": "", "label": "mission paused"}],
         },
-        'reset_execution_on_pause': False
+        "reset_execution_on_pause": False,
     }
     assert expected_obj == tree.dump_object()
 

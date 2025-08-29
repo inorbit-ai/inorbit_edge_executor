@@ -12,6 +12,7 @@ Class:
 Functions:
     setup_logger: defines a logger, sets it up and return it.
 """
+
 import logging
 
 LOG_FILE_PATH = "/tmp/inorbit_edge_executor.log"

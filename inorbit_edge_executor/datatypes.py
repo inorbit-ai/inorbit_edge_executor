@@ -17,9 +17,11 @@ from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
 
+
 class MissionTrackingTypes(Enum):
     API = "api"
     DATASOURCE = "datasource"
+
 
 class MissionStepTypes(Enum):
     SET_DATA = "setData"
