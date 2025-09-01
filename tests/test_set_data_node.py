@@ -4,7 +4,7 @@ from pytest_httpx import HTTPXMock
 from inorbit_edge_executor.behavior_tree import (
     NODE_STATE_SUCCESS,
     SetDataNode,
-    BehaviorTreeBuilderContext
+    BehaviorTreeBuilderContext,
 )
 from inorbit_edge_executor.inorbit import RobotApiFactory, MissionTrackingAPI, InOrbitAPI
 from inorbit_edge_executor.mission import Mission
@@ -21,9 +21,7 @@ async def test_set_data_node(
         id="mission123",
         robot_id="robot123",
         definition=MissionDefinition(
-            steps=[
-                MissionStepSetData(label="Set data", data={"test": "test"})
-            ]
+            steps=[MissionStepSetData(label="Set data", data={"test": "test"})]
         ),
         arguments={},
         tasks_list=[],
@@ -45,8 +43,13 @@ async def test_set_data_node(
         json={},
     )
     await node.execute()
-    assert httpx_mock.get_request(method="PUT", url="http://unittest/missions/mission123") is not None
-    assert httpx_mock.get_request(method="PUT", url="http://unittest/missions/mission123").content == b'{"data": {"test": "test"}}'
+    assert (
+        httpx_mock.get_request(method="PUT", url="http://unittest/missions/mission123") is not None
+    )
+    assert (
+        httpx_mock.get_request(method="PUT", url="http://unittest/missions/mission123").content
+        == b'{"data": {"test": "test"}}'
+    )
     assert node.state == NODE_STATE_SUCCESS
 
 
@@ -60,15 +63,16 @@ async def test_set_data_node_with_expression(
         robot_id="robot123",
         definition=MissionDefinition(
             steps=[
-                MissionStepSetData(label="Set data", data={
-                    "test": "test",
-                    "r2d2_speed": {
-                        "expression": "getValue('speed')",
-                        "target": {
-                            "robotId": "r2d2"
-                        }
-                    }
-                })
+                MissionStepSetData(
+                    label="Set data",
+                    data={
+                        "test": "test",
+                        "r2d2_speed": {
+                            "expression": "getValue('speed')",
+                            "target": {"robotId": "r2d2"},
+                        },
+                    },
+                )
             ]
         ),
         arguments={},
@@ -84,17 +88,14 @@ async def test_set_data_node_with_expression(
         robot_api=robot,
         robot_api_factory=robot_api_factory,
     )
-    node = SetDataNode(context, {
-        "my_battery": {
-            "expression": "getValue('battery')"
+    node = SetDataNode(
+        context,
+        {
+            "my_battery": {"expression": "getValue('battery')"},
+            "r2d2_speed": {"expression": "getValue('speed')", "target": {"robotId": "r2d2"}},
         },
-        "r2d2_speed": {
-            "expression": "getValue('speed')",
-            "target": {
-                "robotId": "r2d2"
-            }
-        }
-    })
+    )
+
     def custom_response(request: httpx.Request):
         if (
             request.method == "POST"
@@ -114,9 +115,7 @@ async def test_set_data_node_with_expression(
                 status_code=200,
                 json={"success": True, "value": 10},
             )
-        return httpx.Response(
-            status_code=400, json={"success": False, "message": "Invalid"}
-        )
+        return httpx.Response(status_code=400, json={"success": False, "message": "Invalid"})
 
     httpx_mock.add_callback(custom_response)
     await node.execute()

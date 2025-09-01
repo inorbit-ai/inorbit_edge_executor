@@ -18,8 +18,8 @@ TODOs in this file:
  - For Action nodes, read API response and fail if the action was not executed. (Even better: wait
    for completion if the state is 'running')
 """
+
 import asyncio
-import math
 import sys
 import traceback
 from datetime import datetime
@@ -74,10 +74,16 @@ class BehaviorTreeBuilderContext:
     happens during dispatching a mission or de-serializing incomplete missions from storage.
     """
 
-    def __init__(self, robot_api: RobotApi = None, mt: MissionTrackingMission = None,
-                 mission: Mission = None, error_context: Dict[str, str] = {},
-                 robot_api_factory: RobotApiFactory = None, options: MissionRuntimeOptions = None,
-                 shared_memory: MissionRuntimeSharedMemory = None):
+    def __init__(
+        self,
+        robot_api: RobotApi = None,
+        mt: MissionTrackingMission = None,
+        mission: Mission = None,
+        error_context: Dict[str, str] = {},
+        robot_api_factory: RobotApiFactory = None,
+        options: MissionRuntimeOptions = None,
+        shared_memory: MissionRuntimeSharedMemory = None,
+    ):
         self._robot_api = robot_api
         self._mt = mt
         self._mission = mission
@@ -617,9 +623,7 @@ class WaitExpressionNode(BehaviorTree):
 
     async def _execute(self):
         result = False
-        logger.debug(
-            f"waiting for expression {self.expression} on {self.robot.robot_id}"
-        )
+        logger.debug(f"waiting for expression {self.expression} on {self.robot.robot_id}")
         while not result:
             try:
                 result = await self.robot.evaluate_expression(self.expression)
@@ -841,7 +845,9 @@ class SetDataNode(BehaviorTree):
             if isinstance(value, dict):
                 expression = value.get("expression")
                 target_robot_id = value.get("target", {}).get("robotId")
-                robot = self.robot_api_factory.build(target_robot_id) if target_robot_id else self.robot
+                robot = (
+                    self.robot_api_factory.build(target_robot_id) if target_robot_id else self.robot
+                )
                 evaluated_data = await robot.evaluate_expression(expression)
                 data_dict[key] = evaluated_data
             else:
@@ -1123,12 +1129,16 @@ class TreeBuilder:
     def build_tree_for_mission(self, context: BehaviorTreeBuilderContext) -> BehaviorTree:
         raise Exception("Implemented by subclass")
 
+
 class DefaultTreeBuilder(TreeBuilder):
     """Default tree builder for the edge executor that uses the behavior tree nodes provided in
     this package"""
+
     def __init__(self, step_builder_factory: NodeFromStepBuilder = None, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._step_builder_factory = step_builder_factory if step_builder_factory else NodeFromStepBuilder
+        self._step_builder_factory = (
+            step_builder_factory if step_builder_factory else NodeFromStepBuilder
+        )
 
     def build_tree_for_mission(self, context: BehaviorTreeBuilderContext) -> BehaviorTree:
         mission = context.mission
@@ -1145,9 +1155,7 @@ class DefaultTreeBuilder(TreeBuilder):
             # Before every step, keep robot locked
             tree.add_node(LockRobotNode(context, label="lock robot"))
             if step.timeout_secs is not None and type(node) not in (WaitNode, TimeoutNode):
-                node = TimeoutNode(
-                    step.timeout_secs, node, label=f"timeout for {step.label}"
-                )
+                node = TimeoutNode(step.timeout_secs, node, label=f"timeout for {step.label}")
             if step.complete_task is not None:
                 tree.add_node(
                     TaskStartedNode(
@@ -1168,24 +1176,18 @@ class DefaultTreeBuilder(TreeBuilder):
                 )
 
         tree.add_node(MissionCompletedNode(context, label="mission completed"))
-        tree.add_node(
-            UnlockRobotNode(context, label="unlock robot after mission completed")
-        )
+        tree.add_node(UnlockRobotNode(context, label="unlock robot after mission completed"))
         # add error handlers
         on_error = BehaviorTreeSequential(label="error handlers")
         on_error.add_node(
             MissionAbortedNode(context, status=MissionStatus.error, label="mission aborted")
         )
-        on_error.add_node(
-            UnlockRobotNode(context, label="unlock robot after mission abort")
-        )
+        on_error.add_node(UnlockRobotNode(context, label="unlock robot after mission abort"))
         on_cancel = BehaviorTreeSequential(label="cancel handlers")
         on_cancel.add_node(
             MissionAbortedNode(context, status=MissionStatus.ok, label="mission cancelled")
         )
-        on_cancel.add_node(
-            UnlockRobotNode(context, label="unlock robot after mission cancel")
-        )
+        on_cancel.add_node(UnlockRobotNode(context, label="unlock robot after mission cancel"))
         on_pause = BehaviorTreeSequential(label="pause handlers")
         on_pause.add_node(MissionPausedNode(context, label="mission paused"))
         tree = BehaviorTreeErrorHandler(

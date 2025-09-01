@@ -4,6 +4,7 @@ worker_pool
 Worker pool implementation. Implements a Pool of workers to be used for mission
 execution.
 """
+
 import asyncio
 
 from .behavior_tree import (
@@ -12,8 +13,12 @@ from .behavior_tree import (
     DefaultTreeBuilder,
     build_tree_from_object,
 )
-from .datatypes import (MissionRuntimeOptions, MissionRuntimeSharedMemory, MissionWorkerState,
-    MissionTrackingTypes)
+from .datatypes import (
+    MissionRuntimeOptions,
+    MissionRuntimeSharedMemory,
+    MissionWorkerState,
+    MissionTrackingTypes,
+)
 from .db import WorkerPersistenceDB
 from .exceptions import RobotBusyException, TranslationException
 from .inorbit import InOrbitAPI, MissionStatus, MissionTrackingAPI, RobotApiFactory
@@ -44,8 +49,14 @@ class WorkerPool:
        Normally, only the definition part of the mission would be changed.
     """
 
-    def __init__(self, api: InOrbitAPI, db: WorkerPersistenceDB, mt_type: MissionTrackingTypes = None,
-        robot_session_config: dict = None, behavior_tree_builder: TreeBuilder = None):
+    def __init__(
+        self,
+        api: InOrbitAPI,
+        db: WorkerPersistenceDB,
+        mt_type: MissionTrackingTypes = None,
+        robot_session_config: dict = None,
+        behavior_tree_builder: TreeBuilder = None,
+    ):
         if not api:
             raise Exception("Missing InOrbitAPI for WorkerPool initialization")
         self._api = api
@@ -60,7 +71,9 @@ class WorkerPool:
         self._running = False
         # Lock to protect workers pool state
         self._mutex = asyncio.Lock()
-        self._behavior_tree_builder = behavior_tree_builder if behavior_tree_builder else DefaultTreeBuilder()
+        self._behavior_tree_builder = (
+            behavior_tree_builder if behavior_tree_builder else DefaultTreeBuilder()
+        )
 
     async def start(self):
         """

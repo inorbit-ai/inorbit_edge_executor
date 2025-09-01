@@ -18,10 +18,20 @@ import asyncio
 import logging
 import os
 from uuid import uuid4
-from inorbit_edge_executor.behavior_tree import (DefaultTreeBuilder, BehaviorTree,
-    NodeFromStepBuilder, BehaviorTreeBuilderContext, register_accepted_node_types)
-from inorbit_edge_executor.datatypes import (MissionDefinition, MissionRuntimeOptions,
-    MissionStepSetData, MissionStepPoseWaypoint, Pose)
+from inorbit_edge_executor.behavior_tree import (
+    DefaultTreeBuilder,
+    BehaviorTree,
+    NodeFromStepBuilder,
+    BehaviorTreeBuilderContext,
+    register_accepted_node_types,
+)
+from inorbit_edge_executor.datatypes import (
+    MissionDefinition,
+    MissionRuntimeOptions,
+    MissionStepSetData,
+    MissionStepPoseWaypoint,
+    Pose,
+)
 from inorbit_edge_executor.worker_pool import WorkerPool
 from inorbit_edge_executor.dummy_backend import DummyDB
 from inorbit_edge_executor.inorbit import InOrbitAPI
@@ -30,11 +40,13 @@ from inorbit_edge_executor.mission import Mission
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
 class MyWaypointNode(BehaviorTree):
     """
     Node to make the robot go to a waypoint. It should wait for the robot to reach the waypoint
     before completing execution.
     """
+
     def __init__(self, context: BehaviorTreeBuilderContext, waypoint: Pose, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.waypoint = waypoint
@@ -56,21 +68,27 @@ class MyWaypointNode(BehaviorTree):
         node = MyWaypointNode(context, waypoint, **kwargs)
         return node
 
+
 # Register the new node type so it can be deserialized when needed
 register_accepted_node_types([MyWaypointNode])
 
+
 class MyNodeFromStepBuilder(NodeFromStepBuilder):
     """Translate mission definition steps to behavior tree nodes"""
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
     def visit_pose_waypoint(self, step: MissionStepPoseWaypoint):
         return MyWaypointNode(context=self.context, label=step.label, waypoint=step.waypoint)
 
+
 class MyTreeBuilder(DefaultTreeBuilder):
     """Build a behavior tree from a mission definition"""
+
     def __init__(self, *args, **kwargs):
         super().__init__(MyNodeFromStepBuilder, *args, **kwargs)
+
 
 async def main():
     """Run the mission executor"""
@@ -103,10 +121,10 @@ async def main():
             "state": "starting",
             "label": "Example inorbit_edge_executor mission",
             "tasks": [
-                { "taskId": "step 1", "label": "Step 1" },
-                { "taskId": "step 2", "label": "Step 2" },
-            ]
-        }
+                {"taskId": "step 1", "label": "Step 1"},
+                {"taskId": "step 2", "label": "Step 2"},
+            ],
+        },
     )
     # Launch the worker pool to start processing missions
     await worker_pool.start()
@@ -118,18 +136,16 @@ async def main():
             label="A mission definition",
             steps=[
                 MissionStepSetData(
-                    label="set some data",
-                    completeTask="step 1",
-                    data={"key": "value"}
+                    label="set some data", completeTask="step 1", data={"key": "value"}
                 ),
                 MissionStepPoseWaypoint(
                     label="go to waypoint",
                     completeTask="step 2",
-                    waypoint=Pose(x=0, y=0, theta=0, frameId="map", waypointId="wp1")
-                )
-            ]
+                    waypoint=Pose(x=0, y=0, theta=0, frameId="map", waypointId="wp1"),
+                ),
+            ],
         ),
-        arguments={"arg1": "value1"}
+        arguments={"arg1": "value1"},
     )
     options = MissionRuntimeOptions()
     await worker_pool.submit_work(mission=mission, options=options)

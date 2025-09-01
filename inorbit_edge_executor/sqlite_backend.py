@@ -209,4 +209,3 @@ class SqliteDB(WorkerPersistenceDB):
         """
         await queries.delete_finished_missions(self.db)
         await self.db.commit()
-

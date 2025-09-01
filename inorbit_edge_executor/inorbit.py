@@ -15,11 +15,13 @@ from functools import wraps
 
 logger = setup_logger("EdgeExecutor.InOrbit")
 
+
 def with_robot_session(func):
     """
     Decorator to get robot session. It's used by MissionTrackingDatasources
     class to get the robot session from the pool and inject it into the function.
     """
+
     @wraps(func)
     async def wrapper(self, *args, **kwargs):
         try:
@@ -166,6 +168,7 @@ class InOrbitAPI:
                 method="DELETE", url=f"{self._base_url}/{path}", json=body, headers=self.headers
             )
 
+
 class MissionTrackingMission:
     """Wrapper for Mission Tracking API."""
 
@@ -184,61 +187,44 @@ class MissionTrackingMission:
     @property
     def arguments(self):
         return self._mission.arguments
-    
+
     @property
     def definition(self):
         return self._mission.definition
 
     async def start(self, is_resume=False):
-        raise NotImplementedError(
-            "start() must be implemented in the derived class"
-        )
+        raise NotImplementedError("start() must be implemented in the derived class")
 
     async def mark_in_progress(self):
-        raise NotImplementedError(
-            "mark_in_progress() must be implemented in the derived class"
-        )
+        raise NotImplementedError("mark_in_progress() must be implemented in the derived class")
 
     async def get_mission(self):
-        raise NotImplementedError(
-            "get_mission() must be implemented in the derived class"
-        )
+        raise NotImplementedError("get_mission() must be implemented in the derived class")
 
     async def completed(self):
-        raise NotImplementedError(
-            "completed() must be implemented in the derived class"
-        )
+        raise NotImplementedError("completed() must be implemented in the derived class")
 
     async def pause(self):
-        raise NotImplementedError(
-            "pause() must be implemented in the derived class"
-        )
+        raise NotImplementedError("pause() must be implemented in the derived class")
 
     async def abort(self, status: MissionStatus = MissionStatus.error):
-        raise NotImplementedError(
-            "abort() must be implemented in the derived class"
-        )
+        raise NotImplementedError("abort() must be implemented in the derived class")
 
     async def report_tasks(self):
-        raise NotImplementedError(
-            "report_tasks() must be implemented in the derived class"
-        )
+        raise NotImplementedError("report_tasks() must be implemented in the derived class")
 
     async def add_data(self, data):
-        raise NotImplementedError(
-            "add_data() must be implemented in the derived class"
-        )
+        raise NotImplementedError("add_data() must be implemented in the derived class")
 
     async def resolve_arguments(self, arguments):
-        raise NotImplementedError(
-            "resolve_arguments() must be implemented in the derived class"
-        )
+        raise NotImplementedError("resolve_arguments() must be implemented in the derived class")
 
     def _build_tasks_list(self):
         return [t.model_dump(mode="json", by_alias=True) for t in self._mission.tasks_list]
 
     async def resolve_arguments(self, arguments):
         return await MissionDataResolver(arguments, self._mission, self).resolve()
+
 
 class MissionTrackingAPI(MissionTrackingMission):
     """
@@ -386,6 +372,7 @@ class MissionTrackingAPI(MissionTrackingMission):
         except Exception as e:
             logger.warning(f"Error sending mission data to mission-tracking {e}")
             return False
+
 
 class MissionDataResolver:
     """
@@ -631,11 +618,12 @@ class RobotApiFactory:
     def build(self, robot_id: str):
         return RobotApi(Robot(id=robot_id), self._api)
 
+
 class InOrbitRobotSessionFactory:
     """
     Factory to create a session for a robot. This is used to create a session for a robot
     in the InOrbit API.
     """
 
-    def __init__(self, config:dict):
+    def __init__(self, config: dict):
         raise NotImplementedError("InOrbitRobotSessionFactory is not implemented")
