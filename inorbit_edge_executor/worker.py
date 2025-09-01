@@ -128,7 +128,6 @@ class Worker(Observable):
             self._task.cancel(CANCEL_TASK_PAUSE_MESSAGE)
 
     def serialize(self) -> MissionWorkerState:
-        print("In serialize", self._shared_memory)
         return MissionWorkerState(
             mission_id=self._mission.id,
             state=self.dump_object(),
