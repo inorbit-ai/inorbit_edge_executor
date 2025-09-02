@@ -149,8 +149,7 @@ class WorkerPool:
         # feature was added
         worker.set_paused(serialized_worker.state.get("paused", False))
         # Set the MissionTrackingAPI from the context if available
-        if context.mt is not None:
-            worker.set_mt(context.mt)
+        worker.set_mt(context.mt)
         return worker
 
     async def execute_serialized_worker(self, worker_state: MissionWorkerState):
@@ -323,7 +322,10 @@ class WorkerPool:
         InvalidMissionStateException().
         """
         async with self._mutex:
-            if mission_id not in self._workers:
+            if mission_id in self._workers:
+                await self._workers[mission_id].pause()
+                del self._workers[mission_id]
+            else:
                 serialized_mission = await self._db.fetch_mission(mission_id=mission_id)
                 if serialized_mission and serialized_mission.state["paused"]:
                     logger.warning(f"Mission {mission_id} is already paused.")
@@ -331,9 +333,6 @@ class WorkerPool:
                 elif not serialized_mission or serialized_mission.state["finished"]:
                     logger.warning(f"Mission {mission_id} not found or it's already finished")
                     raise MissionNotFoundException()
-            else:
-                await self._workers[mission_id].pause()
-                del self._workers[mission_id]
 
     async def resume_mission(self, mission_id) -> None:
         """
