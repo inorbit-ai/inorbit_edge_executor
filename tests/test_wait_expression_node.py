@@ -28,7 +28,7 @@ async def test_wait_expression_node(httpx_mock: HTTPXMock, robot_api_factory: Ro
         if (
             request.method == "POST"
             and request.url.path == "/expressions/robot/robot123/eval"
-            and request.content.decode("utf-8") == '{"expression": "getValue(\'battery\') > 20"}'
+            and request.content.decode("utf-8") == '{"expression":"getValue(\'battery\') > 20"}'
         ):
             eval_count += 1
             return httpx.Response(
@@ -37,7 +37,7 @@ async def test_wait_expression_node(httpx_mock: HTTPXMock, robot_api_factory: Ro
             )
         return httpx.Response(status_code=400, json={"success": False, "message": "Invalid"})
 
-    httpx_mock.add_callback(custom_response)
+    httpx_mock.add_callback(custom_response, is_reusable=True)
     node = WaitExpressionNode(
         context, "getValue('battery') > 20", label="wait expression", retry_wait_secs=0.1
     )

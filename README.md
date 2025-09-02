@@ -118,6 +118,87 @@ Then initialize the worker pool with `MyTreeBuilder()`:
 pool = WorkerPool(db=DummyDB(), api=InOrbitAPI(), behavior_tree_builder=MyTreeBuilder())
 ```
 
+### Controlling the execution of a mission
+
+The worker pool provides methods to control the execution of a mission:
+- `pause_mission()`: Pauses a running mission.
+- `resume_mission()`: Resumes a paused mission.
+- `abort_mission()`: Cancels a running mission.
+
+A robot Connector should implement the handling of the custom commands `"executeMissionAction"`, `"cancelMissionAction"` and `"updateMissionAction"` and call the corresponding methods in the worker pool to control a mission.
+
+<!-- TODO(b-Tomas): move this to a working example -->
+
+The following is a minimal [inorbit-connector](https://github.com/inorbit-ai/inorbit-connector-python) commands handler example that implements said commands:
+
+```python
+import json
+from typing import override
+from inorbit_edge.robot import COMMAND_CUSTOM_COMMAND
+from inorbit_connector.connector import CommandResultCode, Connector # inorbit-connector~=1.2.1
+
+def parse_args(args) -> dict:
+    """Parse InOrbit command arguments to key-value pairs"""
+    args_raw = list(args[1])
+    script_args = {}
+    if (
+        isinstance(args_raw, list)
+        and len(args_raw) % 2 == 0
+        and all(isinstance(key, str) for key in args_raw[::2])
+    ):
+        script_args = dict(zip(args_raw[::2], args_raw[1::2]))
+        return script_args
+    else:
+        return None
+
+
+class ExampleRobot(Connector):
+    """
+    Example robot snippet that implements the custom command handler.
+    It assumes a worker pool is has been initialized..
+    """
+    ...
+
+    @override
+    async def _inorbit_command_handler(robot_id, command_name, args, options):
+    """Handler for processing custom command calls.
+    Refer to https://github.com/inorbit-ai/inorbit-connector-python for documentation.
+    """
+    if command_name == COMMAND_CUSTOM_COMMAND:
+        script_name = args[0]
+        script_args = parse_args(args)
+
+        if script_args is None:
+            return options["result_function"](CommandResultCode.FAILURE, "Invalid arguments")
+
+        if script_name == "executeMissionAction"
+            mission = Mission(
+                id=script_args.get("missionId"),
+                robot_id=self.robot_id,
+                definition=json.loads(script_args.get("missionDefinition", "{}")),
+                arguments=json.loads(script_args.get("missionArgs", "{}")),
+            )
+
+            mission_runtime_options = MissionRuntimeOptions(**json.loads(script_args.get("options", "{}")))
+
+            await self._worker_pool.submit_work(mission, mission_runtime_options)
+
+        elif script_name == "cancelMissionAction":
+            await self._worker_pool.abort_mission(script_args.get("missionId"))
+
+        elif script_name == "updateMissionAction":
+            mission_id = script_args.get("missionId")
+            action = script_args.get("action")
+            if action == "pause":
+                await self._worker_pool.pause_mission(mission_id)
+            elif action == "resume":
+                await self._worker_pool.resume_mission(mission_id)
+            else:
+                return options["result_function"](CommandResultCode.FAILURE, "Invalid action")
+
+    options["result_function"](CommandResultCode.SUCCESS)
+```
+
 ### Common concepts
 
 - **WorkerPool**: Manages mission workers, start with `start()`, submit via `submit_work()`, and stop with `shutdown()`.

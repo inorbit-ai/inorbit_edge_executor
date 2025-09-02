@@ -48,7 +48,7 @@ async def test_set_data_node(
     )
     assert (
         httpx_mock.get_request(method="PUT", url="http://unittest/missions/mission123").content
-        == b'{"data": {"test": "test"}}'
+        == b'{"data":{"test":"test"}}'
     )
     assert node.state == NODE_STATE_SUCCESS
 
@@ -100,7 +100,7 @@ async def test_set_data_node_with_expression(
         if (
             request.method == "POST"
             and request.url.path == "/expressions/robot/robot123/eval"
-            and request.content.decode("utf-8") == '{"expression": "getValue(\'battery\')"}'
+            and request.content.decode("utf-8") == '{"expression":"getValue(\'battery\')"}'
         ):
             return httpx.Response(
                 status_code=200,
@@ -109,7 +109,7 @@ async def test_set_data_node_with_expression(
         elif (
             request.method == "POST"
             and request.url.path == "/expressions/robot/r2d2/eval"
-            and request.content.decode("utf-8") == '{"expression": "getValue(\'speed\')"}'
+            and request.content.decode("utf-8") == '{"expression":"getValue(\'speed\')"}'
         ):
             return httpx.Response(
                 status_code=200,
@@ -117,8 +117,8 @@ async def test_set_data_node_with_expression(
             )
         return httpx.Response(status_code=400, json={"success": False, "message": "Invalid"})
 
-    httpx_mock.add_callback(custom_response)
+    httpx_mock.add_callback(custom_response, is_reusable=True)
     await node.execute()
     assert node.state == NODE_STATE_SUCCESS
     request = httpx_mock.get_request(method="PUT", url="http://unittest/missions/mission123")
-    assert request.content == b'{"data": {"my_battery": 25, "r2d2_speed": 10}}'
+    assert request.content == b'{"data":{"my_battery":25,"r2d2_speed":10}}'
