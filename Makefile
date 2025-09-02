@@ -47,3 +47,12 @@ clean:  ## clean all build, python, and testing files
 
 build: ## run tox / run tests and lint
 	tox
+
+bump-patch: ## bump patch version (e.g., 3.1.1 → 3.1.2)
+	bump-my-version bump patch
+
+bump-minor: ## bump minor version (e.g., 3.1.1 → 3.2.0)
+	bump-my-version bump minor
+
+bump-major: ## bump major version (e.g., 3.1.1 → 4.0.0)
+	bump-my-version bump major

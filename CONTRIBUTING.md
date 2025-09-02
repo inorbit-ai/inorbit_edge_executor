@@ -64,10 +64,10 @@ virtualenv venv
 pip install -e .[dev]
 ```
 
-Then run `bump2version` and choose the part of the version to be bumped, and don't forget to push changes and tags:
+Then run `make bump-[major / minor / patch]` and choose the part of the version to be bumped, and don't forget to push changes and tags:
 
 ```bash
-bump2version patch # possible: major / minor / patch
+make bump-patch # possible: bump-major / bump-minor / bump-patch
 git push
 git push --tags
 ```
