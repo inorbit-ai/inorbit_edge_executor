@@ -196,8 +196,11 @@ class MissionTrackingMission:
     def definition(self):
         return self._mission.definition
 
-    async def start(self, is_resume=False):
+    async def start(self):
         raise NotImplementedError("start() must be implemented in the derived class")
+
+    async def resume(self):
+        raise NotImplementedError("resume() must be implemented in the derived class")
 
     async def mark_in_progress(self):
         raise NotImplementedError("mark_in_progress() must be implemented in the derived class")
@@ -240,23 +243,16 @@ class MissionTrackingAPI(MissionTrackingMission):
         super().__init__(mission)
         self._api = api
 
-    async def start(self, is_resume=False):
+    async def start(self):
         """
         Starts a new Mission in Mission Tracking API and marks it as in progress.
-        send is_resume=True if the mission was paused and its execution is being resumed
         """
         try:
-            if is_resume:
-                req = {
-                    "state": str(MissionState.in_progress),
-                    "inProgress": True,
-                }
-            else:
-                req = {
-                    "state": str(MissionState.starting),
-                    "inProgress": False,
-                    "startTs": current_timestamp_ms(),
-                }
+            req = {
+                "state": str(MissionState.starting),
+                "inProgress": False,
+                "startTs": current_timestamp_ms(),
+            }
             if self._mission.arguments:
                 req["arguments"] = self._mission.arguments
             r = await self._api.put(build_mission_api_path(self.id), req)
@@ -264,6 +260,22 @@ class MissionTrackingAPI(MissionTrackingMission):
             return True
         except Exception as e:
             logger.warning(f"Error marking mission as started in mission-tracking {e}")
+            return False
+
+    async def resume(self):
+        """
+        Resumes a mission in Mission Tracking API. Used to resume a mission that was paused.
+        """
+        try:
+            req = {
+                "state": str(MissionState.in_progress),
+                "inProgress": True,
+            }
+            r = await self._api.put(build_mission_api_path(self.id), req)
+            r.raise_for_status()
+            return True
+        except Exception as e:
+            logger.warning(f"Error resuming mission in mission-tracking {e}")
             return False
 
     async def mark_in_progress(self):

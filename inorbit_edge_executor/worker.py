@@ -143,7 +143,7 @@ class Worker(Observable):
             self._behavior_tree.reset_handlers_execution()
             # Mark the mission as un-paused in Mission Tracking
             if self._mt is not None:
-                await self._mt.start(is_resume=True)
+                await self._mt.resume()
             return True
         return False
 
