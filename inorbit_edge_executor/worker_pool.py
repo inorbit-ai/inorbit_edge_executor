@@ -161,22 +161,7 @@ class WorkerPool:
             worker = self.build_worker_from_serialized(worker_state)
             logger.debug(f"Worker from serialized: {worker}")
             # If the worker was paused, resume it
-            if worker.paused:
-                # This code executes only when resuming from a paused worker (not resuming from
-                # worker that was running at the time the service shut down)
-                # We need to un-pause the worker (just a flag), clear any exception handler
-                # (so that the pause handlers can execute again) and mark mission as un-paused
-                # in Mission Tracking.
-                worker.set_paused(False)
-                worker._behavior_tree.reset_handlers_execution()
-                # Resumes the mission in Mission Tracking
-                # NOTE (Elvio): Since the workers have the capability to use the MT API
-                # it's not that wrong to call the API here, but consider moving it
-                # to another place in the future.
-                # The call is here and not in a Node because there's no ResumeNode implemented
-                # and also it shouldn't exist
-                if worker._mt is not None:
-                    await worker._mt.start(is_resume=True)
+            await worker.resume()
             # Worker is being executed, it should be tracked in memory
             self._workers[worker._mission.id] = worker
             worker.subscribe(self)

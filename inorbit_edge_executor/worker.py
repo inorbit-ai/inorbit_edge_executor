@@ -121,15 +121,31 @@ class Worker(Observable):
                 pass
 
     def cancel(self):
+        """Cancel the worker execution. Returns True if the worker was running, False otherwise."""
         if self._task:
             self._task.cancel()
             return True
         return False
 
     async def pause(self):
+        """Mark the worker as paused and stop it execution"""
         if self._task:
             self.set_paused(True)
             self._task.cancel(CANCEL_TASK_PAUSE_MESSAGE)
+
+    async def resume(self):
+        """
+        Resumes the worker if it was paused. Returns True if the worker was paused and resumed, False otherwise.
+        """
+        if self.paused:
+            self.set_paused(False)
+            # Clears any exception hadlers so that the pause handlers can execute again
+            self._behavior_tree.reset_handlers_execution()
+            # Mark the mission as un-paused in Mission Tracking
+            if self._mt is not None:
+                await self._mt.start(is_resume=True)
+            return True
+        return False
 
     def serialize(self) -> MissionWorkerState:
         return MissionWorkerState(
