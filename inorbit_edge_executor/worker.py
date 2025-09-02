@@ -61,6 +61,10 @@ class Worker(Observable):
     def set_paused(self, paused):
         self._paused = paused
 
+    def set_mt(self, mt):
+        """Set the MissionTrackingAPI for this worker"""
+        self._mt = mt
+
     async def notify(self, behavior_tree):
         """Notified when the behavior tree changed. Just propagate the event"""
         await self.notify_observers()

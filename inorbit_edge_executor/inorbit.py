@@ -246,12 +246,17 @@ class MissionTrackingAPI(MissionTrackingMission):
         send is_resume=True if the mission was paused and its execution is being resumed
         """
         try:
-            req = {
-                "state": str(MissionState.starting),
-                "inProgress": False,
-            }
-            if not is_resume:
-                req["startTs"] = current_timestamp_ms()
+            if is_resume:
+                req = {
+                    "state": str(MissionState.in_progress),
+                    "inProgress": True,
+                }
+            else:
+                req = {
+                    "state": str(MissionState.starting),
+                    "inProgress": False,
+                    "startTs": current_timestamp_ms(),
+                }
             if self._mission.arguments:
                 req["arguments"] = self._mission.arguments
             r = await self._api.put(build_mission_api_path(self.id), req)

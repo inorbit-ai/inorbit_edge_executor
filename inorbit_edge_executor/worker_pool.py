@@ -20,7 +20,12 @@ from .datatypes import (
     MissionTrackingTypes,
 )
 from .db import WorkerPersistenceDB
-from .exceptions import RobotBusyException, TranslationException
+from .exceptions import (
+    InvalidMissionStateException,
+    MissionNotFoundException,
+    RobotBusyException,
+    TranslationException,
+)
 from .inorbit import InOrbitAPI, MissionStatus, MissionTrackingAPI, RobotApiFactory
 from .logger import setup_logger
 from .mission import Mission
@@ -143,6 +148,9 @@ class WorkerPool:
         # NOTE (Elvio): This validation was added for backward compatibility when the pause/resume
         # feature was added
         worker.set_paused(serialized_worker.state.get("paused", False))
+        # Set the MissionTrackingAPI from the context if available
+        if context.mt is not None:
+            worker.set_mt(context.mt)
         return worker
 
     async def execute_serialized_worker(self, worker_state: MissionWorkerState):
@@ -168,7 +176,8 @@ class WorkerPool:
                 # to another place in the future.
                 # The call is here and not in a Node because there's no ResumeNode implemented
                 # and also it shouldn't exist
-                await worker._mt.start(is_resume=True)
+                if worker._mt is not None:
+                    await worker._mt.start(is_resume=True)
             # Worker is being executed, it should be tracked in memory
             self._workers[worker._mission.id] = worker
             worker.subscribe(self)
@@ -276,7 +285,7 @@ class WorkerPool:
         except Exception as e:
             logger.error(f"Error persisting worker {worker.id()} state: {str(e)}")
 
-    async def abort_mission(self, mission_id: str) -> bool | dict:
+    def abort_mission(self, mission_id: str) -> dict | bool:
         """
         Aborts running a mission. If there is no worker for the mission, it returns False.
 
@@ -290,9 +299,12 @@ class WorkerPool:
         """
         if mission_id in self._workers:
             ret = {"id": mission_id}
-        return False
+            ret["cancelled"] = self._workers[mission_id].cancel()
+            return ret
+        else:
+            return False
 
-    async def get_mission_status(self, mission_id):
+    async def get_mission_status(self, mission_id) -> dict | None:
         """
         Returns a serialized representation of the status of a mission (of its worker). This uses
         the same serialization methods used for persisting mission states, which must fully
@@ -303,3 +315,38 @@ class WorkerPool:
                 return self._workers[mission_id].dump_object()
             else:
                 return None
+
+    async def pause_mission(self, mission_id) -> None:
+        """
+        Pauses a running mission. If there's no worker for the mission it raises
+        MissionNotFoundException(). If the mission is already paused it raises
+        InvalidMissionStateException().
+        """
+        async with self._mutex:
+            if mission_id not in self._workers:
+                serialized_mission = await self._db.fetch_mission(mission_id=mission_id)
+                if serialized_mission and serialized_mission.state["paused"]:
+                    logger.warning(f"Mission {mission_id} is already paused.")
+                    raise InvalidMissionStateException()
+                elif not serialized_mission or serialized_mission.state["finished"]:
+                    logger.warning(f"Mission {mission_id} not found or it's already finished")
+                    raise MissionNotFoundException()
+            else:
+                await self._workers[mission_id].pause()
+                del self._workers[mission_id]
+
+    async def resume_mission(self, mission_id) -> None:
+        """
+        Resumes a paused mission. Paused missions are retrieved from the db, they are serialized
+        and they should not be running in a worker. If the mission is finished or not present in
+        the db it raises a MissionNotFoundException(). If the mission is not paused it raises
+        InvalidMissionStateException().
+        """
+        serialized_mission = await self._db.fetch_mission(mission_id=mission_id)
+        if not serialized_mission or serialized_mission.state["finished"]:
+            logger.warning(f"Mission {mission_id} not found or it's already finished.")
+            raise MissionNotFoundException()
+        if not serialized_mission.state["paused"]:
+            logger.warning(f"Mission {mission_id} is not paused. It will not be resumed")
+            raise InvalidMissionStateException()
+        await self.execute_serialized_worker(serialized_mission)
