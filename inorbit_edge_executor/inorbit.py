@@ -150,23 +150,27 @@ class InOrbitAPI:
         return headers
 
     async def get(self, path):
-        return httpx.get(f"{self._base_url}/{path}", headers=self.headers)
+        async with httpx.AsyncClient() as client:
+            return await client.get(f"{self._base_url}/{path}", headers=self.headers)
 
     async def post(self, path, body):
-        return httpx.post(f"{self._base_url}/{path}", json=body, headers=self.headers)
+        async with httpx.AsyncClient() as client:
+            return await client.post(f"{self._base_url}/{path}", json=body, headers=self.headers)
 
     async def put(self, path, body=None):
-        return httpx.put(f"{self._base_url}/{path}", json=body, headers=self.headers)
+        async with httpx.AsyncClient() as client:
+            return await client.put(f"{self._base_url}/{path}", json=body, headers=self.headers)
 
     async def delete(self, path, body=None):
-        if not body:
-            return httpx.delete(f"{self._base_url}/{path}", headers=self.headers)
-        else:
-            # httpx library does not allow sending a body payload in DELETE requests (as it appears
-            # to be a non-recommended practice). Instead, se request() directly; which is equivalent
-            return httpx.request(
-                method="DELETE", url=f"{self._base_url}/{path}", json=body, headers=self.headers
-            )
+        async with httpx.AsyncClient() as client:
+            if not body:
+                return await client.delete(f"{self._base_url}/{path}", headers=self.headers)
+            else:
+                # httpx library does not allow sending a body payload in DELETE requests (as it appears
+                # to be a non-recommended practice). Instead, se request() directly; which is equivalent
+                return await client.request(
+                    method="DELETE", url=f"{self._base_url}/{path}", json=body, headers=self.headers
+                )
 
 
 class MissionTrackingMission:
