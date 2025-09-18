@@ -558,6 +558,7 @@ class RunActionNode(BehaviorTree):
         arguments,
         target: Target = None,
         max_retries: int = 3,
+        retry_wait_seconds: float = 5.0,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -566,6 +567,7 @@ class RunActionNode(BehaviorTree):
         self.arguments = arguments
         self.target = target
         self.max_retries = max_retries
+        self.retry_wait_seconds = retry_wait_seconds
         if self.target is None:
             self.robot = context.robot_api
         else:
@@ -586,9 +588,9 @@ class RunActionNode(BehaviorTree):
                 if attempt < self.max_retries:
                     logger.warning(
                         f"Action execution failed (attempt {attempt + 1}/{self.max_retries + 1}): {e}. "
-                        f"Retrying in 5 seconds..."
+                        f"Retrying in {self.retry_wait_seconds} seconds..."
                     )
-                    await asyncio.sleep(5)
+                    await asyncio.sleep(self.retry_wait_seconds)
                 else:
                     logger.error(
                         f"Action execution failed after {self.max_retries + 1} attempts: {e}"
@@ -607,15 +609,17 @@ class RunActionNode(BehaviorTree):
         object["action_id"] = self.action_id
         object["arguments"] = self.arguments
         object["max_retries"] = self.max_retries
+        object["retry_wait_seconds"] = self.retry_wait_seconds
         if self.target is not None:
             object["target"] = self.target.dump_object()
         return object
 
     @classmethod
-    def from_object(cls, context, action_id, arguments, target=None, max_retries=3, **kwargs):
+    def from_object(cls, context, action_id, arguments, target=None, max_retries=3, retry_wait_seconds=5.0, **kwargs):
         if target is not None:
             target = Target.from_object(**target)
-        return RunActionNode(context, action_id, arguments, target, max_retries, **kwargs)
+        return RunActionNode(context, action_id, arguments, target, max_retries,
+                             retry_wait_seconds, **kwargs)
 
 
 class WaitExpressionNode(BehaviorTree):

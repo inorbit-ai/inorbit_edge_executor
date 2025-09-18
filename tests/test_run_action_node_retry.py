@@ -1,10 +1,10 @@
-import asyncio
 import pytest
 from unittest.mock import AsyncMock, Mock
 
-from inorbit_edge_executor.behavior_tree import RunActionNode, BehaviorTreeBuilderContext
-from inorbit_edge_executor.datatypes import Robot, Target
-from inorbit_edge_executor.inorbit import RobotApi, InOrbitAPI, RobotApiFactory
+from inorbit_edge_executor.behavior_tree import (RunActionNode,
+                                                 BehaviorTreeBuilderContext)
+from inorbit_edge_executor.datatypes import Target
+from inorbit_edge_executor.inorbit import RobotApi, RobotApiFactory
 
 
 class TestRunActionNodeRetry:
@@ -32,7 +32,8 @@ class TestRunActionNodeRetry:
         return context
 
     @pytest.mark.asyncio
-    async def test_execute_action_success_first_try(self, context, mock_robot_api):
+    async def test_execute_action_success_first_try(self, context,
+                                                    mock_robot_api):
         """Test successful action execution on first attempt"""
         # Setup
         mock_robot_api.execute_action.return_value = {"status": "success"}
@@ -41,17 +42,20 @@ class TestRunActionNodeRetry:
             context=context,
             action_id="test_action",
             arguments={"param": "value"},
-            max_retries=3
+            max_retries=3,
+            retry_wait_seconds=0.01
         )
 
         # Execute
         await node._execute()
 
         # Verify
-        mock_robot_api.execute_action.assert_called_once_with("test_action", arguments={"param": "value"})
+        mock_robot_api.execute_action.assert_called_once_with(
+            "test_action", arguments={"param": "value"})
 
     @pytest.mark.asyncio
-    async def test_execute_action_success_after_retries(self, context, mock_robot_api):
+    async def test_execute_action_success_after_retries(self, context,
+                                                        mock_robot_api):
         """Test successful action execution after some failures"""
         # Setup - fail first 2 attempts, succeed on 3rd
         mock_robot_api.execute_action.side_effect = [
@@ -64,7 +68,8 @@ class TestRunActionNodeRetry:
             context=context,
             action_id="test_action",
             arguments={"param": "value"},
-            max_retries=3
+            max_retries=3,
+            retry_wait_seconds=0.01
         )
 
         # Execute
@@ -74,7 +79,8 @@ class TestRunActionNodeRetry:
         assert mock_robot_api.execute_action.call_count == 3
 
     @pytest.mark.asyncio
-    async def test_execute_action_fail_all_retries(self, context, mock_robot_api):
+    async def test_execute_action_fail_all_retries(self, context,
+                                                   mock_robot_api):
         """Test action execution failure after exhausting all retries"""
         # Setup - all attempts fail
         test_exception = Exception("Persistent network error")
@@ -84,18 +90,20 @@ class TestRunActionNodeRetry:
             context=context,
             action_id="test_action",
             arguments={"param": "value"},
-            max_retries=2
+            max_retries=2,
+            retry_wait_seconds=0.01
         )
 
         # Execute and verify exception is raised
         with pytest.raises(Exception, match="Persistent network error"):
             await node._execute()
 
-        # Verify all retry attempts were made (max_retries + 1 = 3 total attempts)
+        # Verify all retry attempts were made (max_retries + 1 = 3 attempts)
         assert mock_robot_api.execute_action.call_count == 3
 
     @pytest.mark.asyncio
-    async def test_execute_action_different_exception_types(self, context, mock_robot_api):
+    async def test_execute_action_different_exception_types(self, context,
+                                                            mock_robot_api):
         """Test that different types of exceptions are handled consistently"""
         exceptions_to_test = [
             ValueError("Invalid parameter"),
@@ -113,7 +121,8 @@ class TestRunActionNodeRetry:
                 context=context,
                 action_id="test_action",
                 arguments={"param": "value"},
-                max_retries=1
+                max_retries=1,
+                retry_wait_seconds=0.01
             )
 
             # Execute and verify exception is raised
@@ -124,20 +133,23 @@ class TestRunActionNodeRetry:
             assert mock_robot_api.execute_action.call_count == 2
 
     @pytest.mark.asyncio
-    async def test_execute_action_with_custom_max_retries(self, context, mock_robot_api):
+    async def test_execute_action_with_custom_max_retries(self, context,
+                                                          mock_robot_api):
         """Test action execution with different max_retries values"""
         test_cases = [0, 1, 5, 10]
 
         for max_retries in test_cases:
             # Reset mock
             mock_robot_api.execute_action.reset_mock()
-            mock_robot_api.execute_action.side_effect = Exception("Always fail")
+            mock_robot_api.execute_action.side_effect = Exception(
+                "Always fail")
 
             node = RunActionNode(
                 context=context,
                 action_id="test_action",
                 arguments={"param": "value"},
-                max_retries=max_retries
+                max_retries=max_retries,
+                retry_wait_seconds=0.01
             )
 
             # Execute and verify exception is raised
@@ -162,7 +174,8 @@ class TestRunActionNodeRetry:
             context=context,
             action_id="test_action",
             arguments={"param": "value"},
-            max_retries=2
+            max_retries=2,
+            retry_wait_seconds=0.01
         )
 
         # Execute with timing
@@ -171,9 +184,9 @@ class TestRunActionNodeRetry:
         await node._execute()
         end_time = time.time()
 
-        # Should take at least 10 seconds (2 retries * 5 seconds each)
+        # Should take at least 0.02 seconds (2 retries * 0.01 seconds each)
         # but allow some tolerance for test execution overhead
-        assert end_time - start_time >= 9.5
+        assert end_time - start_time >= 0.015
 
     @pytest.mark.asyncio
     async def test_execute_action_with_target_robot(self, mock_mission_tracking):
@@ -183,7 +196,8 @@ class TestRunActionNodeRetry:
 
         # Create mock robot API factory
         mock_target_robot_api = Mock(spec=RobotApi)
-        mock_target_robot_api.execute_action = AsyncMock(return_value={"status": "success"})
+        mock_target_robot_api.execute_action = AsyncMock(
+            return_value={"status": "success"})
 
         mock_factory = Mock(spec=RobotApiFactory)
         mock_factory.build.return_value = mock_target_robot_api
@@ -197,7 +211,8 @@ class TestRunActionNodeRetry:
             action_id="test_action",
             arguments={"param": "value"},
             target=target,
-            max_retries=2
+            max_retries=2,
+            retry_wait_seconds=0.01
         )
 
         # Execute
@@ -205,7 +220,8 @@ class TestRunActionNodeRetry:
 
         # Verify
         mock_factory.build.assert_called_once_with("target_robot")
-        mock_target_robot_api.execute_action.assert_called_once_with("test_action", arguments={"param": "value"})
+        mock_target_robot_api.execute_action.assert_called_once_with(
+            "test_action", arguments={"param": "value"})
 
     def test_dump_object_includes_max_retries(self, context):
         """Test that dump_object includes max_retries parameter"""
@@ -213,12 +229,14 @@ class TestRunActionNodeRetry:
             context=context,
             action_id="test_action",
             arguments={"param": "value"},
-            max_retries=5
+            max_retries=5,
+            retry_wait_seconds=0.01
         )
 
         dumped = node.dump_object()
 
         assert dumped["max_retries"] == 5
+        assert dumped["retry_wait_seconds"] == 0.01
         assert dumped["action_id"] == "test_action"
         assert dumped["arguments"] == {"param": "value"}
 
@@ -228,10 +246,12 @@ class TestRunActionNodeRetry:
             context=context,
             action_id="test_action",
             arguments={"param": "value"},
-            max_retries=7
+            max_retries=7,
+            retry_wait_seconds=0.01
         )
 
         assert node.max_retries == 7
+        assert node.retry_wait_seconds == 0.01
         assert node.action_id == "test_action"
         assert node.arguments == {"param": "value"}
 
@@ -244,6 +264,7 @@ class TestRunActionNodeRetry:
         )
 
         assert node.max_retries == 3  # Default value
+        assert node.retry_wait_seconds == 5.0  # Default value
 
     def test_serialization_round_trip(self, context):
         """Test that serialization and deserialization preserve max_retries"""
@@ -252,6 +273,7 @@ class TestRunActionNodeRetry:
             action_id="test_action",
             arguments={"param": "value"},
             max_retries=4,
+            retry_wait_seconds=0.01,
             label="test_label"
         )
 
@@ -263,10 +285,12 @@ class TestRunActionNodeRetry:
         del dumped_for_restore["type"]
 
         # Deserialize
-        restored_node = RunActionNode.from_object(context=context, **dumped_for_restore)
+        restored_node = RunActionNode.from_object(
+            context=context, **dumped_for_restore)
 
         # Verify all properties are preserved
         assert restored_node.max_retries == 4
+        assert restored_node.retry_wait_seconds == 0.01
         assert restored_node.action_id == "test_action"
         assert restored_node.arguments == {"param": "value"}
         assert restored_node.label == "test_label"
