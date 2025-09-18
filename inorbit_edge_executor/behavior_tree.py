@@ -615,11 +615,21 @@ class RunActionNode(BehaviorTree):
         return object
 
     @classmethod
-    def from_object(cls, context, action_id, arguments, target=None, max_retries=3, retry_wait_seconds=5.0, **kwargs):
+    def from_object(
+        cls,
+        context,
+        action_id,
+        arguments,
+        target=None,
+        max_retries=3,
+        retry_wait_seconds=5.0,
+        **kwargs,
+    ):
         if target is not None:
             target = Target.from_object(**target)
-        return RunActionNode(context, action_id, arguments, target, max_retries,
-                             retry_wait_seconds, **kwargs)
+        return RunActionNode(
+            context, action_id, arguments, target, max_retries, retry_wait_seconds, **kwargs
+        )
 
 
 class WaitExpressionNode(BehaviorTree):
