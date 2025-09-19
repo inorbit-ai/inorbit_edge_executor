@@ -557,6 +557,8 @@ class RunActionNode(BehaviorTree):
         action_id,
         arguments,
         target: Target = None,
+        max_retries: int = 3,
+        retry_wait_seconds: float = 5.0,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -564,6 +566,8 @@ class RunActionNode(BehaviorTree):
         self.action_id = action_id
         self.arguments = arguments
         self.target = target
+        self.max_retries = max_retries
+        self.retry_wait_seconds = retry_wait_seconds
         if self.target is None:
             self.robot = context.robot_api
         else:
@@ -571,9 +575,29 @@ class RunActionNode(BehaviorTree):
 
     async def _execute(self):
         arguments = await self.mt.resolve_arguments(self.arguments)
-        resp = await self.robot.execute_action(self.action_id, arguments=arguments)
-        # TODO track action execution, as done in the app. This JSON response only guarantees
-        # the action was *started*.
+
+        last_exception = None
+        for attempt in range(self.max_retries + 1):
+            try:
+                resp = await self.robot.execute_action(self.action_id, arguments=arguments)
+                # TODO track action execution, as done in the app. This JSON response only guarantees
+                # the action was *started*.
+                return  # Success, exit retry loop
+            except Exception as e:
+                last_exception = e
+                if attempt < self.max_retries:
+                    logger.warning(
+                        f"Action execution failed (attempt {attempt + 1}/{self.max_retries + 1}): {e}. "
+                        f"Retrying in {self.retry_wait_seconds} seconds..."
+                    )
+                    await asyncio.sleep(self.retry_wait_seconds)
+                else:
+                    logger.error(
+                        f"Action execution failed after {self.max_retries + 1} attempts: {e}"
+                    )
+
+        # All retries exhausted, raise the last exception
+        raise last_exception
 
     async def on_pause(self):
         # TODO (Elvio): Here goes the logic to stop an action when a Mission is paused
@@ -584,15 +608,28 @@ class RunActionNode(BehaviorTree):
         object = super().dump_object()
         object["action_id"] = self.action_id
         object["arguments"] = self.arguments
+        object["max_retries"] = self.max_retries
+        object["retry_wait_seconds"] = self.retry_wait_seconds
         if self.target is not None:
             object["target"] = self.target.dump_object()
         return object
 
     @classmethod
-    def from_object(cls, context, action_id, arguments, target=None, **kwargs):
+    def from_object(
+        cls,
+        context,
+        action_id,
+        arguments,
+        target=None,
+        max_retries=3,
+        retry_wait_seconds=5.0,
+        **kwargs,
+    ):
         if target is not None:
             target = Target.from_object(**target)
-        return RunActionNode(context, action_id, arguments, target, **kwargs)
+        return RunActionNode(
+            context, action_id, arguments, target, max_retries, retry_wait_seconds, **kwargs
+        )
 
 
 class WaitExpressionNode(BehaviorTree):
