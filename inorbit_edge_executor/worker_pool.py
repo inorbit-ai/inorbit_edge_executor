@@ -103,12 +103,53 @@ class WorkerPool:
         for worker_state in serialized_workers:
             await self.execute_serialized_worker(worker_state)
 
-    async def shutdown(self):
+    async def shutdown(self, timeout: float = 10.0):
         """
-        Stops the worker pool. It's actually not doing anything more than preventing new jobs
-        to be submitted.
+        Stops the worker pool gracefully by cancelling all running tasks.
+
+        Args:
+            timeout: Maximum time to wait for graceful shutdown before forcing cancellation
         """
+        if not self._running:
+            return
+
         self._running = False
+        logger.info("Starting worker pool shutdown...")
+
+        # Get all running workers and cancel them
+        async with self._mutex:
+            workers_to_cancel = list(self._workers.values())
+
+        if workers_to_cancel:
+            logger.info(f"Cancelling {len(workers_to_cancel)} running workers...")
+
+            # Cancel all workers and collect their tasks
+            cancelled_tasks = []
+            for worker in workers_to_cancel:
+                try:
+                    if worker.cancel() and worker._task:
+                        cancelled_tasks.append(worker._task)
+                except Exception as e:
+                    logger.error(f"Error cancelling worker {worker.id()}: {e}")
+
+            if cancelled_tasks:
+                # Wait for tasks to complete cancellation with timeout
+                try:
+                    await asyncio.wait_for(
+                        asyncio.gather(*cancelled_tasks, return_exceptions=True), timeout=timeout
+                    )
+                    logger.info("All workers cancelled gracefully")
+                except asyncio.TimeoutError:
+                    logger.warning(f"Timeout waiting for graceful shutdown after {timeout}s")
+        else:
+            logger.info("No running workers to cancel")
+
+        # Clean up workers dictionary
+        async with self._mutex:
+            self._workers.clear()
+
+        # Shutdown the database connection
+        await self._db.shutdown()
 
     async def notify(self, worker: Worker):
         """Notified when a worker changed its state. Persist it"""
