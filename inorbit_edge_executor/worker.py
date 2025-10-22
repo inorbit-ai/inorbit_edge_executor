@@ -133,6 +133,10 @@ class Worker(Observable):
             self.set_paused(True)
             self._task.cancel(CANCEL_TASK_PAUSE_MESSAGE)
 
+    def get_task(self):
+        """Get the task associated with the worker. This is used to wait for the task to complete during shutdown."""
+        return self._task
+
     async def resume(self):
         """
         Resumes the worker if it was paused. Returns True if the worker was paused and resumed, False otherwise.

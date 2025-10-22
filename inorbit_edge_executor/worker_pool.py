@@ -127,8 +127,8 @@ class WorkerPool:
             cancelled_tasks = []
             for worker in workers_to_cancel:
                 try:
-                    if worker.cancel() and worker._task:
-                        cancelled_tasks.append(worker._task)
+                    if worker.cancel():
+                        cancelled_tasks.append(worker.get_task())
                 except Exception as e:
                     logger.error(f"Error cancelling worker {worker.id()}: {e}")
 
