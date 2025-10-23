@@ -38,6 +38,7 @@ class Worker(Observable):
         self._robot_api_factory = None
         self._behavior_tree = None
         self._shared_memory = shared_memory
+        self._task: asyncio.Task = None
 
     def id(self):
         return self._mission.id
@@ -132,6 +133,10 @@ class Worker(Observable):
         if self._task:
             self.set_paused(True)
             self._task.cancel(CANCEL_TASK_PAUSE_MESSAGE)
+
+    def get_task(self) -> asyncio.Task | None:
+        """Get the task associated with the worker. This is used to wait for the task to complete during shutdown."""
+        return self._task
 
     async def resume(self):
         """
