@@ -192,7 +192,7 @@ class MissionStepIf(MissionStep):
         model_config = ConfigDict(extra="forbid")
         expression: str
         target: Target = Field(default=None)
-        then: "StepsList" = Field(alias="if")
+        then: "StepsList" = Field(alias="then")
         else_: Optional["StepsList"] = Field(alias="else", default=None)
 
     if_step: IfArgs = Field(alias="if")
