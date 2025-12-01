@@ -100,7 +100,7 @@ def test_mission_step_if_with_label_and_timeout():
                 "expression": "getValue('battery') > 50",
                 "if": [{"data": {"key": "value"}}],
             }
-        }
+        },
     )
     assert step.label == "Check battery"
     assert step.timeout_secs == 30.0
