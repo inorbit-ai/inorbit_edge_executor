@@ -18,7 +18,7 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
-requires-python = ">=3.10,<3.13"
+requires-python = ">=3.10,<3.15"
 dependencies = [
     "async-timeout~=4.0.3",
     "httpx~=0.28.1",
@@ -43,7 +43,7 @@ packages = ["inorbit_edge_executor"]
 include-package-data = true
 
 [tool.black]
-target-version = ['py310']
+target-version = ['py310', 'py311', 'py312', 'py313'] # py314 is not yet supported by black
 line-length = 100
 
 [tool.bumpversion]
