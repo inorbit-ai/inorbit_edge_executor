@@ -14,7 +14,7 @@ def test_mission_step_if_basic():
         **{
             "if": {
                 "expression": "getValue('battery') > 50",
-                "if": [{"data": {"key": "value"}}],
+                "then": [{"data": {"key": "value"}}],
             }
         }
     )
@@ -32,7 +32,7 @@ def test_mission_step_if_with_else():
         **{
             "if": {
                 "expression": "getValue('battery') > 50",
-                "if": [{"data": {"key": "if_value"}}],
+                "then": [{"data": {"key": "if_value"}}],
                 "else": [{"data": {"key": "else_value"}}],
             }
         }
@@ -53,7 +53,7 @@ def test_mission_step_if_with_target():
             "if": {
                 "expression": "getValue('battery') > 50",
                 "target": {"robotId": "robot456"},
-                "if": [{"timeoutSecs": 10}],
+                "then": [{"timeoutSecs": 10}],
             }
         }
     )
@@ -70,11 +70,11 @@ def test_mission_step_if_nested():
         **{
             "if": {
                 "expression": "getValue('battery') > 50",
-                "if": [
+                "then": [
                     {
                         "if": {
                             "expression": "getValue('status') == 'ready'",
-                            "if": [{"data": {"nested": True}}],
+                            "then": [{"data": {"nested": True}}],
                         }
                     }
                 ],
@@ -98,7 +98,7 @@ def test_mission_step_if_with_label_and_timeout():
         **{
             "if": {
                 "expression": "getValue('battery') > 50",
-                "if": [{"data": {"key": "value"}}],
+                "then": [{"data": {"key": "value"}}],
             }
         },
     )
@@ -113,7 +113,7 @@ def test_mission_step_if_accept_visitor():
         **{
             "if": {
                 "expression": "getValue('battery') > 50",
-                "if": [{"data": {"key": "value"}}],
+                "then": [{"data": {"key": "value"}}],
             }
         }
     )
@@ -135,7 +135,7 @@ def test_mission_definition_with_if_step():
             {
                 "if": {
                     "expression": "getValue('battery') > 50",
-                    "if": [{"data": {"key": "value"}}],
+                    "then": [{"data": {"key": "value"}}],
                     "else": [{"timeoutSecs": 5}],
                 }
             }
@@ -152,7 +152,7 @@ def test_mission_step_if_multiple_steps_in_branches():
         **{
             "if": {
                 "expression": "getValue('battery') > 50",
-                "if": [
+                "then": [
                     {"data": {"step": "if1"}},
                     {"data": {"step": "if2"}},
                     {"timeoutSecs": 10},
@@ -177,7 +177,7 @@ def test_mission_step_if_validation():
     """Test that MissionStepIf validates required fields."""
     # Should fail without expression
     with pytest.raises(Exception):
-        MissionStepIf(**{"if": {"if": [{"data": {"key": "value"}}]}})
+        MissionStepIf(**{"if": {"then": [{"data": {"key": "value"}}]}})
 
     # Should fail without if branch
     with pytest.raises(Exception):
