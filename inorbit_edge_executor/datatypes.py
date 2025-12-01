@@ -195,7 +195,6 @@ class MissionStepIf(MissionStep):
         then: "StepsList" = Field(alias="if")
         else_: Optional["StepsList"] = Field(alias="else", default=None)
 
-    # TODO(herchu) find a better way to parse the nested { if: { expression, if, else } }
     if_step: IfArgs = Field(alias="if")
 
     def _get_expression(self):
