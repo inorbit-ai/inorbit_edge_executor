@@ -701,10 +701,12 @@ class IfNode(BehaviorTree):
         then_branch: BehaviorTree,
         else_branch: BehaviorTree = None,
         target: Target = None,
+        retry_wait_secs: float = 3,
         **kwargs,
     ):
         super().__init__(**kwargs)
         self.expression = expression
+        self.retry_wait_secs = retry_wait_secs
         self.then_branch = then_branch
         self.else_branch = else_branch
         self.target = target
@@ -726,7 +728,7 @@ class IfNode(BehaviorTree):
                 except Exception as e:
                     logger.warning(f"Attempt {attempt} failed for expression {self.expression}: {e}")
                     if attempt < max_attempts:
-                        await asyncio.sleep(3)
+                        await asyncio.sleep(self.retry_wait_secs)
                     else:
                         logger.error(f"All {max_attempts} attempts failed for expression {self.expression}")
                         raise
@@ -778,6 +780,7 @@ class IfNode(BehaviorTree):
             object["else_branch"] = self.else_branch.dump_object()
         if self.target is not None:
             object["target"] = self.target.dump_object()
+        object["retry_wait_secs"] = self.retry_wait_secs
         return object
 
     @classmethod
@@ -1085,15 +1088,13 @@ class MissionStepCancelledNode(BehaviorTree):
 
 
 class NodeFromStepBuilder:
-    def __init__(self, context: BehaviorTreeBuilderContext, wrap_nodes: bool = False):
+    def __init__(self, context: BehaviorTreeBuilderContext):
         """
         Implements the visitor pattern for building behavior tree nodes from mission steps.
         Args:
             context: The behavior tree builder context.
-            wrap_nodes: Whether to wrap the step node with lock robot, timeout, and task tracking nodes.
         """
         self.context = context
-        self._wrap_nodes = wrap_nodes
         self.waypoint_distance_tolerance = WAYPOINT_DISTANCE_TOLERANCE_DEFAULT
         self.waypoint_angular_tolerance = WAYPOINT_ANGULAR_TOLERANCE_DEFAULT
         args = context.mission.arguments
@@ -1116,8 +1117,6 @@ class NodeFromStepBuilder:
         Wraps a core step node with lock robot, timeout, and task tracking nodes.
         Returns a BehaviorTreeSequential containing all necessary nodes for the step.
         """
-        if not self._wrap_nodes:
-            return core_node
         sequential = BehaviorTreeSequential(label=step.label)
 
         # Always add lock robot node before the step
@@ -1360,11 +1359,8 @@ class DefaultTreeBuilder(TreeBuilder):
     def __init__(self, step_builder_factory: NodeFromStepBuilder = None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._step_builder_factory = (
-            step_builder_factory if step_builder_factory else self._default_step_builder
+            step_builder_factory if step_builder_factory else NodeFromStepBuilder
         )
-
-    def _default_step_builder(self, context: BehaviorTreeBuilderContext) -> NodeFromStepBuilder:
-        return NodeFromStepBuilder(context, wrap_nodes=True)
 
     def build_tree_for_mission(self, context: BehaviorTreeBuilderContext) -> BehaviorTree:
         mission = context.mission

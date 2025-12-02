@@ -180,6 +180,7 @@ async def test_if_node_propagates_error_from_expression_evaluation(
         url="http://unittest/expressions/robot/robot123/eval",
         status_code=500,
         json={"success": False, "message": "Internal server error"},
+        is_reusable=True,
     )
 
     then_branch = BehaviorTreeSequential(label="then")
@@ -190,6 +191,7 @@ async def test_if_node_propagates_error_from_expression_evaluation(
         expression="getValue('battery') > 50",
         then_branch=then_branch,
         label="if node",
+        retry_wait_secs=0.1,
     )
 
     await node.execute()
