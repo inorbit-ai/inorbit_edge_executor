@@ -687,6 +687,99 @@ class WaitExpressionNode(BehaviorTree):
         return WaitExpressionNode(context, expression, target, **kwargs)
 
 
+class IfNode(BehaviorTree):
+    """
+    Node that evaluates an expression once and conditionally executes either a "then" or "else"
+    branch based on the result. The expression is evaluated through REST APIs, normally in the same
+    robot that executes the mission.
+    """
+
+    def __init__(
+        self,
+        context: BehaviorTreeBuilderContext,
+        expression: str,
+        then_branch: BehaviorTree,
+        else_branch: BehaviorTree = None,
+        target: Target = None,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self.expression = expression
+        self.then_branch = then_branch
+        self.else_branch = else_branch
+        self.target = target
+        if self.target is None:
+            self.robot = context.robot_api
+        else:
+            self.robot = context.robot_api_factory.build(self.target.robot_id)
+
+    async def _execute(self):
+        logger.debug(f"evaluating expression {self.expression} on {self.robot.robot_id}")
+        try:
+            result = await self.robot.evaluate_expression(self.expression)
+        except Exception as e:
+            logger.error(f"Error evaluating expression {self.expression}: {e}")
+            raise e
+
+        if result:
+            logger.debug(f"expression {self.expression} == true, executing then branch")
+            await self.then_branch.execute()
+            self.state = self.then_branch.state
+            self.last_error = self.then_branch.last_error
+        else:
+            if self.else_branch is not None:
+                logger.debug(f"expression {self.expression} == false, executing else branch")
+                await self.else_branch.execute()
+                self.state = self.else_branch.state
+                self.last_error = self.else_branch.last_error
+            else:
+                logger.debug(f"expression {self.expression} == false, no else branch, succeeding")
+                # No else branch, succeed (no-op)
+
+    def reset_execution(self):
+        super().reset_execution()
+        if self.then_branch:
+            self.then_branch.reset_execution()
+        if self.else_branch:
+            self.else_branch.reset_execution()
+
+    def reset_handlers_execution(self):
+        super().reset_handlers_execution()
+        if self.then_branch:
+            self.then_branch.reset_handlers_execution()
+        if self.else_branch:
+            self.else_branch.reset_handlers_execution()
+
+    def collect_nodes(self, nodes_list: List):
+        super().collect_nodes(nodes_list)
+        if self.then_branch:
+            self.then_branch.collect_nodes(nodes_list)
+        if self.else_branch:
+            self.else_branch.collect_nodes(nodes_list)
+
+    def dump_object(self):
+        object = super().dump_object()
+        object["expression"] = self.expression
+        object["then_branch"] = self.then_branch.dump_object()
+        if self.else_branch is not None:
+            object["else_branch"] = self.else_branch.dump_object()
+        if self.target is not None:
+            object["target"] = self.target.dump_object()
+        return object
+
+    @classmethod
+    def from_object(cls, context, expression, then_branch, else_branch=None, target=None, **kwargs):
+        then_branch_tree = build_tree_from_object(context, then_branch)
+        else_branch_tree = (
+            build_tree_from_object(context, else_branch) if else_branch else None
+        )
+        if target is not None:
+            target = Target.from_object(**target)
+        return IfNode(
+            context, expression, then_branch_tree, else_branch_tree, target, **kwargs
+        )
+
+
 class DummyNode(BehaviorTree):
     async def _execute(self):
         pass
@@ -1174,23 +1267,31 @@ class NodeFromStepBuilder:
 
     def visit_if(self, step: MissionStepIf):
         # Build the behavior tree nodes for the then branch
-        # then_branch = BehaviorTreeSequential(label=step.label)
-        # for then_step in step.then:
-        #     then_branch.add_node(then_step.accept(self))
-        # # Build the behavior tree nodes for the else branch
-        # else_branch = BehaviorTreeSequential(label=step.label)
-        # for else_step in step.else_:
-        #     else_branch.add_node(else_step.accept(self))
-        # # Create the if node
-        # if_node = IfNode(
-        #     context=self.context,
-        #     expression=step.expression,
-        #     then_branch=then_branch,
-        #     else_branch=else_branch,
-        #     label=step.label,
-        # )
-        #return if_node
-        raise NotImplementedError("visit_if not implemented")
+        then_label = f"{step.label} - then" if step.label else "then"
+        then_branch = BehaviorTreeSequential(label=then_label)
+        for then_step in step.then:
+            node = then_step.accept(self)
+            if node:
+                then_branch.add_node(node)
+        # Build the behavior tree nodes for the else branch (if it exists)
+        else_branch = None
+        if step.else_ is not None:
+            else_label = f"{step.label} - else" if step.label else "else"
+            else_branch = BehaviorTreeSequential(label=else_label)
+            for else_step in step.else_:
+                node = else_step.accept(self)
+                if node:
+                    else_branch.add_node(node)
+        # Create the if node
+        if_node = IfNode(
+            context=self.context,
+            expression=step.expression,
+            then_branch=then_branch,
+            else_branch=else_branch,
+            target=step.target,
+            label=step.label,
+        )
+        return self._wrap_step_node(step, if_node)
 
 
 # List of accepted node types (classes). With register_accepted_node_types(),
@@ -1201,6 +1302,7 @@ accepted_node_types = [
     WaitNode,
     RunActionNode,
     WaitExpressionNode,
+    IfNode,
     DummyNode,
     TimeoutNode,
     MissionStartNode,

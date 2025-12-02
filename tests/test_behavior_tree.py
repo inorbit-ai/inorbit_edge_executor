@@ -210,3 +210,147 @@ def test_bt_set_data():
     logger.info(step_node)
     expected_obj = {"type": "SetDataNode", "state": "", "data": {"repeatId": "abcde"}}
     assert expected_obj == step_node
+
+
+def test_bt_if():
+    """
+    Tests parsing and serializing of an if step with then and else branches
+    """
+    steps = [
+        {
+            "if": {
+                "expression": "getValue('battery') > 50",
+                "then": [{"data": {"key": "if_value"}}],
+                "else": [{"data": {"key": "else_value"}}],
+            }
+        }
+    ]
+    mission: Mission = Mission(
+        id="mission123",
+        robot_id="robot123",
+        definition=MissionDefinition(label="A mission", steps=steps),
+    )
+    api: InOrbitAPI = InOrbitAPI(base_url="localhost:1000", api_key="secret")
+    context = BehaviorTreeBuilderContext()
+    context.robot_api_factory = RobotApiFactory(api)
+    context.mission = mission
+    context.options = MissionRuntimeOptions()
+    tree: BehaviorTree = DefaultTreeBuilder().build_tree_for_mission(context)
+    tree_obj = tree.dump_object()
+    # Since we know the structure of the tree (tested in the first test), only fetch the node
+    # corresponding to the step created
+    assert len(tree_obj["children"]) == 1
+    mission_sequential = tree_obj["children"][0]
+    # MissionInProgressNode, step sequential, MissionCompletedNode, UnlockRobotNode
+    assert len(mission_sequential["children"]) == 4
+    # The step sequential should be at index 1 (after MissionInProgressNode)
+    step_sequential = mission_sequential["children"][1]
+    assert step_sequential["type"] == "BehaviorTreeSequential"
+    # LockRobotNode, IfNode (wrapped in TimeoutNode if timeout_secs is set)
+    assert len(step_sequential["children"]) == 2
+    step_node = step_sequential["children"][1]
+    logger.info(step_node)
+    # The IfNode should be wrapped, so we need to check the wrapped structure
+    assert step_node["type"] == "IfNode"
+    assert step_node["expression"] == "getValue('battery') > 50"
+    assert step_node["then_branch"]["type"] == "BehaviorTreeSequential"
+    assert step_node["else_branch"]["type"] == "BehaviorTreeSequential"
+    # Check that the branches contain the expected SetDataNode
+    # Each step in then/else is wrapped in a sequential with LockRobotNode
+    then_children = step_node["then_branch"]["children"]
+    assert len(then_children) == 1
+    # The step is wrapped in a sequential
+    assert then_children[0]["type"] == "BehaviorTreeSequential"
+    # Inside the wrapped sequential: LockRobotNode, SetDataNode
+    wrapped_then_children = then_children[0]["children"]
+    assert len(wrapped_then_children) == 2
+    assert wrapped_then_children[0]["type"] == "LockRobotNode"
+    assert wrapped_then_children[1]["type"] == "SetDataNode"
+    assert wrapped_then_children[1]["data"]["key"] == "if_value"
+    else_children = step_node["else_branch"]["children"]
+    assert len(else_children) == 1
+    # The step is wrapped in a sequential
+    assert else_children[0]["type"] == "BehaviorTreeSequential"
+    # Inside the wrapped sequential: LockRobotNode, SetDataNode
+    wrapped_else_children = else_children[0]["children"]
+    assert len(wrapped_else_children) == 2
+    assert wrapped_else_children[0]["type"] == "LockRobotNode"
+    assert wrapped_else_children[1]["type"] == "SetDataNode"
+    assert wrapped_else_children[1]["data"]["key"] == "else_value"
+
+
+def test_bt_if_no_else():
+    """
+    Tests parsing and serializing of an if step with only then branch (no else)
+    """
+    steps = [
+        {
+            "if": {
+                "expression": "getValue('battery') > 50",
+                "then": [{"data": {"key": "if_value"}}],
+            }
+        }
+    ]
+    mission: Mission = Mission(
+        id="mission123",
+        robot_id="robot123",
+        definition=MissionDefinition(label="A mission", steps=steps),
+    )
+    api: InOrbitAPI = InOrbitAPI(base_url="localhost:1000", api_key="secret")
+    context = BehaviorTreeBuilderContext()
+    context.robot_api_factory = RobotApiFactory(api)
+    context.mission = mission
+    context.options = MissionRuntimeOptions()
+    tree: BehaviorTree = DefaultTreeBuilder().build_tree_for_mission(context)
+    tree_obj = tree.dump_object()
+    assert len(tree_obj["children"]) == 1
+    mission_sequential = tree_obj["children"][0]
+    assert len(mission_sequential["children"]) == 4
+    step_sequential = mission_sequential["children"][1]
+    assert step_sequential["type"] == "BehaviorTreeSequential"
+    assert len(step_sequential["children"]) == 2
+    step_node = step_sequential["children"][1]
+    logger.info(step_node)
+    assert step_node["type"] == "IfNode"
+    assert step_node["expression"] == "getValue('battery') > 50"
+    assert step_node["then_branch"]["type"] == "BehaviorTreeSequential"
+    # else_branch should not be present in serialization
+    assert "else_branch" not in step_node
+
+
+def test_bt_if_with_target():
+    """
+    Tests parsing and serializing of an if step with target robot
+    """
+    steps = [
+        {
+            "if": {
+                "expression": "getValue('battery') > 50",
+                "target": {"robotId": "robot456"},
+                "then": [{"data": {"key": "if_value"}}],
+            }
+        }
+    ]
+    mission: Mission = Mission(
+        id="mission123",
+        robot_id="robot123",
+        definition=MissionDefinition(label="A mission", steps=steps),
+    )
+    api: InOrbitAPI = InOrbitAPI(base_url="localhost:1000", api_key="secret")
+    context = BehaviorTreeBuilderContext()
+    context.robot_api_factory = RobotApiFactory(api)
+    context.mission = mission
+    context.options = MissionRuntimeOptions()
+    tree: BehaviorTree = DefaultTreeBuilder().build_tree_for_mission(context)
+    tree_obj = tree.dump_object()
+    assert len(tree_obj["children"]) == 1
+    mission_sequential = tree_obj["children"][0]
+    assert len(mission_sequential["children"]) == 4
+    step_sequential = mission_sequential["children"][1]
+    assert step_sequential["type"] == "BehaviorTreeSequential"
+    assert len(step_sequential["children"]) == 2
+    step_node = step_sequential["children"][1]
+    logger.info(step_node)
+    assert step_node["type"] == "IfNode"
+    assert step_node["expression"] == "getValue('battery') > 50"
+    assert step_node["target"]["robot_id"] == "robot456"
