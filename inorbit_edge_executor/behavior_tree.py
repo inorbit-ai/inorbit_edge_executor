@@ -36,6 +36,7 @@ from .datatypes import MissionStepRunAction
 from .datatypes import MissionStepSetData
 from .datatypes import MissionStepWait
 from .datatypes import MissionStepWaitUntil
+from .datatypes import MissionStepIf
 from .datatypes import Target
 from .exceptions import TaskPausedException
 from .inorbit import ACTION_CANCEL_NAV_ID
@@ -1114,6 +1115,9 @@ class NodeFromStepBuilder:
         return WaitExpressionNode(
             context=self.context, expression=step.expression, target=step.target, label=step.label
         )
+
+    def visit_if(self, step: MissionStepIf):
+        raise NotImplementedError("visit_if not implemented")
 
 
 # List of accepted node types (classes). With register_accepted_node_types(),
