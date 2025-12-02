@@ -716,7 +716,20 @@ class IfNode(BehaviorTree):
     async def _execute(self):
         logger.debug(f"evaluating expression {self.expression} on {self.robot.robot_id}")
         try:
-            result = await self.robot.evaluate_expression(self.expression)
+            result = None
+            max_attempts = 5
+            for attempt in range(1, max_attempts + 1):
+                try:
+                    logger.debug(f"Attempt {attempt}/{max_attempts} to evaluate expression: {self.expression}")
+                    result = await self.robot.evaluate_expression(self.expression)
+                    break
+                except Exception as e:
+                    logger.warning(f"Attempt {attempt} failed for expression {self.expression}: {e}")
+                    if attempt < max_attempts:
+                        await asyncio.sleep(3)
+                    else:
+                        logger.error(f"All {max_attempts} attempts failed for expression {self.expression}")
+                        raise
         except Exception as e:
             logger.error(f"Error evaluating expression {self.expression}: {e}")
             raise e
