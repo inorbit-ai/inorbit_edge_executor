@@ -34,7 +34,7 @@ async def test_if_node_executes_then_branch_when_true(
     # Create then and else branches
     then_branch = BehaviorTreeSequential(label="then")
     then_branch.add_node(DummyNode(label="then_node"))
-    
+
     else_branch = BehaviorTreeSequential(label="else")
     else_branch.add_node(DummyNode(label="else_node"))
 
@@ -75,7 +75,7 @@ async def test_if_node_executes_else_branch_when_false(
     # Create then and else branches
     then_branch = BehaviorTreeSequential(label="then")
     then_branch.add_node(DummyNode(label="then_node"))
-    
+
     else_branch = BehaviorTreeSequential(label="else")
     else_branch.add_node(DummyNode(label="else_node"))
 
@@ -132,9 +132,7 @@ async def test_if_node_succeeds_when_false_no_else_branch(
 
 
 @pytest.mark.asyncio
-async def test_if_node_with_target(
-    httpx_mock: HTTPXMock, robot_api_factory: RobotApiFactory
-):
+async def test_if_node_with_target(httpx_mock: HTTPXMock, robot_api_factory: RobotApiFactory):
     """Test that IfNode evaluates expression on target robot when target is provided."""
     robot = robot_api_factory.build("robot123")
     context = BehaviorTreeBuilderContext(
@@ -247,7 +245,7 @@ def test_if_node_serialize(empty_context: BehaviorTreeBuilderContext):
     """Test serialization of IfNode."""
     then_branch = BehaviorTreeSequential(label="then")
     then_branch.add_node(DummyNode(label="then_node"))
-    
+
     else_branch = BehaviorTreeSequential(label="else")
     else_branch.add_node(DummyNode(label="else_node"))
 
@@ -343,7 +341,7 @@ def test_if_node_collect_nodes(empty_context: BehaviorTreeBuilderContext):
     then_branch = BehaviorTreeSequential(label="then")
     then_branch.add_node(DummyNode(label="then_node1"))
     then_branch.add_node(DummyNode(label="then_node2"))
-    
+
     else_branch = BehaviorTreeSequential(label="else")
     else_branch.add_node(DummyNode(label="else_node"))
 
@@ -368,7 +366,7 @@ def test_if_node_reset_execution(empty_context: BehaviorTreeBuilderContext):
     """Test that reset_execution resets both branches."""
     then_branch = BehaviorTreeSequential(label="then")
     then_branch.add_node(DummyNode(label="then_node"))
-    
+
     else_branch = BehaviorTreeSequential(label="else")
     else_branch.add_node(DummyNode(label="else_node"))
 
@@ -391,4 +389,3 @@ def test_if_node_reset_execution(empty_context: BehaviorTreeBuilderContext):
     assert node.state == ""
     assert then_branch.nodes[0].state == ""
     assert else_branch.nodes[0].state == ""
-

@@ -770,14 +770,10 @@ class IfNode(BehaviorTree):
     @classmethod
     def from_object(cls, context, expression, then_branch, else_branch=None, target=None, **kwargs):
         then_branch_tree = build_tree_from_object(context, then_branch)
-        else_branch_tree = (
-            build_tree_from_object(context, else_branch) if else_branch else None
-        )
+        else_branch_tree = build_tree_from_object(context, else_branch) if else_branch else None
         if target is not None:
             target = Target.from_object(**target)
-        return IfNode(
-            context, expression, then_branch_tree, else_branch_tree, target, **kwargs
-        )
+        return IfNode(context, expression, then_branch_tree, else_branch_tree, target, **kwargs)
 
 
 class DummyNode(BehaviorTree):
@@ -1110,10 +1106,10 @@ class NodeFromStepBuilder:
         if not self._wrap_nodes:
             return core_node
         sequential = BehaviorTreeSequential(label=step.label)
-        
+
         # Always add lock robot node before the step
         sequential.add_node(LockRobotNode(self.context, label="lock robot"))
-        
+
         # Add task started node if complete_task is set
         if step.complete_task is not None:
             sequential.add_node(
@@ -1123,17 +1119,15 @@ class NodeFromStepBuilder:
                     label=f"report task {step.complete_task} started",
                 )
             )
-        
+
         # Wrap core node in TimeoutNode if timeout_secs is set and node is not already WaitNode or TimeoutNode
         if step.timeout_secs is not None and type(core_node) not in (WaitNode, TimeoutNode):
-            core_node = TimeoutNode(
-                step.timeout_secs, core_node, label=f"timeout for {step.label}"
-            )
-        
+            core_node = TimeoutNode(step.timeout_secs, core_node, label=f"timeout for {step.label}")
+
         # Add the core node (possibly wrapped in TimeoutNode)
         if core_node:
             sequential.add_node(core_node)
-        
+
         # Add task completed node if complete_task is set
         if step.complete_task is not None:
             sequential.add_node(
@@ -1143,7 +1137,7 @@ class NodeFromStepBuilder:
                     label=f"report task {step.complete_task} completed",
                 )
             )
-        
+
         return sequential
 
     def visit_wait(self, step: MissionStepWait):
