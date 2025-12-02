@@ -31,6 +31,7 @@ from async_timeout import timeout
 
 from .datatypes import MissionRuntimeOptions
 from .datatypes import MissionRuntimeSharedMemory
+from .datatypes import MissionStep
 from .datatypes import MissionStepPoseWaypoint
 from .datatypes import MissionStepRunAction
 from .datatypes import MissionStepSetData
@@ -982,8 +983,15 @@ class MissionStepCancelledNode(BehaviorTree):
 
 
 class NodeFromStepBuilder:
-    def __init__(self, context: BehaviorTreeBuilderContext):
+    def __init__(self, context: BehaviorTreeBuilderContext, wrap_nodes: bool = False):
+        """
+        Implements the visitor pattern for building behavior tree nodes from mission steps.
+        Args:
+            context: The behavior tree builder context.
+            wrap_nodes: Whether to wrap the step node with lock robot, timeout, and task tracking nodes.
+        """
         self.context = context
+        self._wrap_nodes = wrap_nodes
         self.waypoint_distance_tolerance = WAYPOINT_DISTANCE_TOLERANCE_DEFAULT
         self.waypoint_angular_tolerance = WAYPOINT_ANGULAR_TOLERANCE_DEFAULT
         args = context.mission.arguments
@@ -1001,8 +1009,53 @@ class NodeFromStepBuilder:
             if WAYPOINT_ANGULAR_TOLERANCE in args:
                 self.waypoint_angular_tolerance = float(args[WAYPOINT_ANGULAR_TOLERANCE])
 
+    def _wrap_step_node(self, step: MissionStep, core_node: BehaviorTree) -> BehaviorTreeSequential:
+        """
+        Wraps a core step node with lock robot, timeout, and task tracking nodes.
+        Returns a BehaviorTreeSequential containing all necessary nodes for the step.
+        """
+        if not self._wrap_nodes:
+            return core_node
+        sequential = BehaviorTreeSequential(label=step.label)
+        
+        # Always add lock robot node before the step
+        sequential.add_node(LockRobotNode(self.context, label="lock robot"))
+        
+        # Add task started node if complete_task is set
+        if step.complete_task is not None:
+            sequential.add_node(
+                TaskStartedNode(
+                    self.context,
+                    step.complete_task,
+                    label=f"report task {step.complete_task} started",
+                )
+            )
+        
+        # Wrap core node in TimeoutNode if timeout_secs is set and node is not already WaitNode or TimeoutNode
+        if step.timeout_secs is not None and type(core_node) not in (WaitNode, TimeoutNode):
+            core_node = TimeoutNode(
+                step.timeout_secs, core_node, label=f"timeout for {step.label}"
+            )
+        
+        # Add the core node (possibly wrapped in TimeoutNode)
+        if core_node:
+            sequential.add_node(core_node)
+        
+        # Add task completed node if complete_task is set
+        if step.complete_task is not None:
+            sequential.add_node(
+                TaskCompletedNode(
+                    self.context,
+                    step.complete_task,
+                    label=f"report task {step.complete_task} completed",
+                )
+            )
+        
+        return sequential
+
     def visit_wait(self, step: MissionStepWait):
-        return WaitNode(self.context, step.timeout_secs, label=step.label)
+        core_node = WaitNode(self.context, step.timeout_secs, label=step.label)
+        return self._wrap_step_node(step, core_node)
 
     def visit_pose_waypoint(self, step: MissionStepPoseWaypoint):
         waypoint = step.waypoint
@@ -1082,7 +1135,7 @@ class NodeFromStepBuilder:
             reset_execution_on_pause=True,
             label=bt_sequential.label,
         )
-        return tree
+        return self._wrap_step_node(step, tree)
 
     def visit_set_data(self, step: MissionStepSetData):
         # HACK(mike) allow setting the waypoint tolerance using SetData
@@ -1094,7 +1147,8 @@ class NodeFromStepBuilder:
         if WAYPOINT_ANGULAR_TOLERANCE in step.data:
             self.waypoint_angular_tolerance = float(step.data[WAYPOINT_ANGULAR_TOLERANCE])
         # END HACK
-        return SetDataNode(self.context, step.data, label=step.label)
+        core_node = SetDataNode(self.context, step.data, label=step.label)
+        return self._wrap_step_node(step, core_node)
 
     def visit_named_waypoint(self, step):
         raise Exception("Untranslated named waypoint: " + step.waypoint)
@@ -1103,20 +1157,39 @@ class NodeFromStepBuilder:
         return DummyNode(label=step.label)
 
     def visit_run_action(self, step: MissionStepRunAction):
-        return RunActionNode(
+        core_node = RunActionNode(
             context=self.context,
             action_id=step.action_id,
             arguments=step.arguments,
             target=step.target,
             label=step.label,
         )
+        return self._wrap_step_node(step, core_node)
 
     def visit_wait_until(self, step: MissionStepWaitUntil):
-        return WaitExpressionNode(
+        core_node = WaitExpressionNode(
             context=self.context, expression=step.expression, target=step.target, label=step.label
         )
+        return self._wrap_step_node(step, core_node)
 
     def visit_if(self, step: MissionStepIf):
+        # Build the behavior tree nodes for the then branch
+        # then_branch = BehaviorTreeSequential(label=step.label)
+        # for then_step in step.then:
+        #     then_branch.add_node(then_step.accept(self))
+        # # Build the behavior tree nodes for the else branch
+        # else_branch = BehaviorTreeSequential(label=step.label)
+        # for else_step in step.else_:
+        #     else_branch.add_node(else_step.accept(self))
+        # # Create the if node
+        # if_node = IfNode(
+        #     context=self.context,
+        #     expression=step.expression,
+        #     then_branch=then_branch,
+        #     else_branch=else_branch,
+        #     label=step.label,
+        # )
+        #return if_node
         raise NotImplementedError("visit_if not implemented")
 
 
@@ -1178,8 +1251,11 @@ class DefaultTreeBuilder(TreeBuilder):
     def __init__(self, step_builder_factory: NodeFromStepBuilder = None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._step_builder_factory = (
-            step_builder_factory if step_builder_factory else NodeFromStepBuilder
+            step_builder_factory if step_builder_factory else self._default_step_builder
         )
+
+    def _default_step_builder(self, context: BehaviorTreeBuilderContext) -> NodeFromStepBuilder:
+        return NodeFromStepBuilder(context, wrap_nodes=True)
 
     def build_tree_for_mission(self, context: BehaviorTreeBuilderContext) -> BehaviorTree:
         mission = context.mission
@@ -1193,28 +1269,8 @@ class DefaultTreeBuilder(TreeBuilder):
                 node = step.accept(step_builder)
             except Exception as e:  # TODO
                 raise Exception(f"Error building step #{ix} [{step}]: {str(e)}")
-            # Before every step, keep robot locked
-            tree.add_node(LockRobotNode(context, label="lock robot"))
-            if step.timeout_secs is not None and type(node) not in (WaitNode, TimeoutNode):
-                node = TimeoutNode(step.timeout_secs, node, label=f"timeout for {step.label}")
-            if step.complete_task is not None:
-                tree.add_node(
-                    TaskStartedNode(
-                        context,
-                        step.complete_task,
-                        label=f"report task {step.complete_task} started",
-                    )
-                )
             if node:
                 tree.add_node(node)
-            if step.complete_task is not None:
-                tree.add_node(
-                    TaskCompletedNode(
-                        context,
-                        step.complete_task,
-                        label=f"report task {step.complete_task} completed",
-                    )
-                )
 
         tree.add_node(MissionCompletedNode(context, label="mission completed"))
         tree.add_node(UnlockRobotNode(context, label="unlock robot after mission completed"))

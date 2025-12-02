@@ -124,9 +124,15 @@ def test_bt_wait():
     # Since we know the structure of the tree (tested in the first test), only fetch the node
     # corresponding to the step created
     assert len(tree_obj["children"]) == 1
-    sequential_node = tree_obj["children"][0]
-    assert len(sequential_node["children"]) == 5
-    step_node = sequential_node["children"][2]
+    mission_sequential = tree_obj["children"][0]
+    # MissionInProgressNode, step sequential, MissionCompletedNode, UnlockRobotNode
+    assert len(mission_sequential["children"]) == 4
+    # The step sequential should be at index 1 (after MissionInProgressNode)
+    step_sequential = mission_sequential["children"][1]
+    assert step_sequential["type"] == "BehaviorTreeSequential"
+    # LockRobotNode, WaitNode
+    assert len(step_sequential["children"]) == 2
+    step_node = step_sequential["children"][1]
     logger.info(step_node)
     expected_obj = {"type": "WaitNode", "state": "", "wait_seconds": 10.0}
     assert expected_obj == step_node
@@ -153,9 +159,15 @@ def test_bt_wait_expression():
     # Since we know the structure of the tree (tested in the first test), only fetch the node
     # corresponding to the step created
     assert len(tree_obj["children"]) == 1
-    sequential_node = tree_obj["children"][0]
-    assert len(sequential_node["children"]) == 5
-    step_node = sequential_node["children"][2]
+    mission_sequential = tree_obj["children"][0]
+    # MissionInProgressNode, step sequential, MissionCompletedNode, UnlockRobotNode
+    assert len(mission_sequential["children"]) == 4
+    # The step sequential should be at index 1 (after MissionInProgressNode)
+    step_sequential = mission_sequential["children"][1]
+    assert step_sequential["type"] == "BehaviorTreeSequential"
+    # LockRobotNode, WaitExpressionNode
+    assert len(step_sequential["children"]) == 2
+    step_node = step_sequential["children"][1]
     logger.info(step_node)
     expected_obj = {
         "type": "WaitExpressionNode",
@@ -186,9 +198,15 @@ def test_bt_set_data():
     # Since we know the structure of the tree (tested in the first test), only fetch the node
     # corresponding to the step created
     assert len(tree_obj["children"]) == 1
-    sequential_node = tree_obj["children"][0]
-    assert len(sequential_node["children"]) == 5
-    step_node = sequential_node["children"][2]
+    mission_sequential = tree_obj["children"][0]
+    # MissionInProgressNode, step sequential, MissionCompletedNode, UnlockRobotNode
+    assert len(mission_sequential["children"]) == 4
+    # The step sequential should be at index 1 (after MissionInProgressNode)
+    step_sequential = mission_sequential["children"][1]
+    assert step_sequential["type"] == "BehaviorTreeSequential"
+    # LockRobotNode, SetDataNode
+    assert len(step_sequential["children"]) == 2
+    step_node = step_sequential["children"][1]
     logger.info(step_node)
     expected_obj = {"type": "SetDataNode", "state": "", "data": {"repeatId": "abcde"}}
     assert expected_obj == step_node
