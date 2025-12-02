@@ -1293,6 +1293,9 @@ class NodeFromStepBuilder:
         )
         return self._wrap_step_node(step, if_node)
 
+    def visit_if(self, step: MissionStepIf):
+        raise NotImplementedError("visit_if not implemented")
+
 
 # List of accepted node types (classes). With register_accepted_node_types(),
 # this defines how to build nodes from their type fields (strings)
