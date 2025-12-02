@@ -30,6 +30,7 @@ class MissionStepTypes(Enum):
     WAIT_UNTIL = "waitUntil"
     NAMED_WAYPOINT = "namedWaypoint"
     POSE_WAYPOINT = "poseWaypoint"
+    IF = "if"
 
 
 class Robot(BaseModel):
@@ -182,21 +183,67 @@ class MissionStepRunAction(MissionStep):
         return visitor.visit_run_action(self)
 
 
+class MissionStepIf(MissionStep):
+    """
+    Mission step for conditional execution based on an expression.
+    """
+
+    class IfArgs(BaseModel):
+        model_config = ConfigDict(extra="forbid")
+        expression: str
+        target: Target = Field(default=None)
+        then: "StepsList" = Field(alias="then")
+        else_: Optional["StepsList"] = Field(alias="else", default=None)
+
+    if_step: IfArgs = Field(alias="if")
+
+    def _get_expression(self):
+        return self.if_step.expression
+
+    expression = property(fget=_get_expression)
+
+    def _get_target(self):
+        return self.if_step.target
+
+    target = property(fget=_get_target)
+
+    def _get_then(self):
+        return self.if_step.then
+
+    then = property(fget=_get_then)
+
+    def _get_else(self):
+        return self.if_step.else_
+
+    else_ = property(fget=_get_else)
+
+    def accept(self, visitor):
+        return visitor.visit_if(self)
+
+    def get_type(self):
+        return MissionStepTypes.IF.value
+
+
+# Type alias for steps list that includes all step types including MissionStepIf
+StepsList = List[
+    Union[
+        MissionStepSetData,
+        MissionStepPoseWaypoint,
+        MissionStepRunAction,
+        MissionStepWait,
+        MissionStepWaitUntil,
+        MissionStepIf,
+    ]
+]
+
+
 class MissionDefinition(BaseModel):
     """
     Mission Definition. Corresponds to the 'spec' schema of MissionDefinition kind in Config APIs
     """
 
     label: str = ""
-    steps: List[
-        Union[
-            MissionStepSetData,
-            MissionStepPoseWaypoint,
-            MissionStepRunAction,
-            MissionStepWait,
-            MissionStepWaitUntil,
-        ]
-    ]
+    steps: StepsList
     selector: Any = Field(
         default=None
     )  # Accepted from API just to complete schema in struct mode (and ignore the field)
