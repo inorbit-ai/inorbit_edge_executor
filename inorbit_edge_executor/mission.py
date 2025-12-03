@@ -19,7 +19,7 @@ from .datatypes import (
 
 class MissionTasksExtractor:
     """
-    Visitor for mission steps that collects the tasks to be executed.
+    Helper class that visits mission steps and collects the tasks to be executed.
     """
     def __init__(self):
         self._tasks_list: List[MissionTask] = []
@@ -53,6 +53,8 @@ class MissionTasksExtractor:
         self.extract_tasks(step.then)
         if step.else_ is not None:
             self.extract_tasks(step.else_)
+
+
 class Mission(BaseModel):
     """
     Represents a (parsed) mission. It includes the definition, the runtime arguments and tasks.
