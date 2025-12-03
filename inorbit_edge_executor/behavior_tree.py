@@ -1112,19 +1112,25 @@ class NodeFromStepBuilder:
                 self.waypoint_distance_tolerance = float(args[WAYPOINT_DISTANCE_TOLERANCE])
             if WAYPOINT_ANGULAR_TOLERANCE in args:
                 self.waypoint_angular_tolerance = float(args[WAYPOINT_ANGULAR_TOLERANCE])
-        def default_step_wrapper_fn(step: MissionStep, node: BehaviorTree) -> BehaviorTree:
-            return node
-        self._step_wrapper_fn = default_step_wrapper_fn
 
-    def set_step_wrapper(self, step_wrapper_fn: Callable[[MissionStep, BehaviorTree], BehaviorTree]):
-        self._step_wrapper_fn = step_wrapper_fn
-
-    def _wrap_step_node(self, step: MissionStep, core_node: BehaviorTree) -> BehaviorTreeSequential:
-        return self._step_wrapper_fn(step, core_node)
+    def add_step_node_decorator(self, step_decorator_fn: Callable[[MissionStep, BehaviorTree], BehaviorTree]):
+        # Patch all visit_* methods so that they call the step decorator around the real core node
+        for attr_name in dir(self):
+            if attr_name.startswith("visit_") and callable(getattr(self, attr_name)):
+                orig_method = getattr(self, attr_name)
+                # Don't double-wrap if it's already wrapped (avoid recursion)
+                if hasattr(orig_method, "__wrapped_with_step_wrapper__"):
+                    continue
+                def make_wrapped(orig_method):
+                    def visit_method(step):
+                        core_node = orig_method(step)
+                        return step_decorator_fn(step, core_node)
+                    visit_method.__wrapped_with_step_wrapper__ = True
+                    return visit_method
+                setattr(self, attr_name, make_wrapped(orig_method))
 
     def visit_wait(self, step: MissionStepWait):
-        core_node = WaitNode(self.context, step.timeout_secs, label=step.label)
-        return self._wrap_step_node(step, core_node)
+        return WaitNode(self.context, step.timeout_secs, label=step.label)
 
     def visit_pose_waypoint(self, step: MissionStepPoseWaypoint):
         waypoint = step.waypoint
@@ -1204,7 +1210,7 @@ class NodeFromStepBuilder:
             reset_execution_on_pause=True,
             label=bt_sequential.label,
         )
-        return self._wrap_step_node(step, tree)
+        return tree
 
     def visit_set_data(self, step: MissionStepSetData):
         # HACK(mike) allow setting the waypoint tolerance using SetData
@@ -1216,8 +1222,7 @@ class NodeFromStepBuilder:
         if WAYPOINT_ANGULAR_TOLERANCE in step.data:
             self.waypoint_angular_tolerance = float(step.data[WAYPOINT_ANGULAR_TOLERANCE])
         # END HACK
-        core_node = SetDataNode(self.context, step.data, label=step.label)
-        return self._wrap_step_node(step, core_node)
+        return SetDataNode(self.context, step.data, label=step.label)
 
     def visit_named_waypoint(self, step):
         raise Exception("Untranslated named waypoint: " + step.waypoint)
@@ -1226,20 +1231,18 @@ class NodeFromStepBuilder:
         return DummyNode(label=step.label)
 
     def visit_run_action(self, step: MissionStepRunAction):
-        core_node = RunActionNode(
+        return RunActionNode(
             context=self.context,
             action_id=step.action_id,
             arguments=step.arguments,
             target=step.target,
             label=step.label,
         )
-        return self._wrap_step_node(step, core_node)
 
     def visit_wait_until(self, step: MissionStepWaitUntil):
-        core_node = WaitExpressionNode(
+        return WaitExpressionNode(
             context=self.context, expression=step.expression, target=step.target, label=step.label
         )
-        return self._wrap_step_node(step, core_node)
 
     def visit_if(self, step: MissionStepIf):
         # Build the behavior tree nodes for the then branch
@@ -1267,7 +1270,7 @@ class NodeFromStepBuilder:
             target=step.target,
             label=step.label,
         )
-        return self._wrap_step_node(step, if_node)
+        return if_node
 
 
 # List of accepted node types (classes). With register_accepted_node_types(),
@@ -1332,8 +1335,8 @@ class DefaultTreeBuilder(TreeBuilder):
             step_builder_factory if step_builder_factory else NodeFromStepBuilder
         )
 
-    def _build_step_wrapper_for_context(self, context: BehaviorTreeBuilderContext) -> Callable[[MissionStep, BehaviorTree], BehaviorTreeSequential]:
-        def _step_wrapper_fn(step: MissionStep, core_node: BehaviorTree) -> BehaviorTreeSequential:
+    def _build_step_decorator_for_context(self, context: BehaviorTreeBuilderContext) -> Callable[[MissionStep, BehaviorTree], BehaviorTreeSequential]:
+        def _step_decorator_fn(step: MissionStep, core_node: BehaviorTree) -> BehaviorTreeSequential:
             """
             Wraps a step node with lock robot, timeout, and task tracking nodes.
             Returns a BehaviorTreeSequential containing all necessary nodes for the step.
@@ -1372,14 +1375,14 @@ class DefaultTreeBuilder(TreeBuilder):
                 )
 
             return sequential
-        return _step_wrapper_fn
+        return _step_decorator_fn
 
     def build_tree_for_mission(self, context: BehaviorTreeBuilderContext) -> BehaviorTree:
         mission = context.mission
         tree = BehaviorTreeSequential(label=f"mission {mission.id}")
         tree.add_node(MissionInProgressNode(context, label="mission start"))
         step_builder = self._step_builder_factory(context)
-        step_builder.set_step_wrapper(self._build_step_wrapper_for_context(context))
+        step_builder.add_step_node_decorator(self._build_step_decorator_for_context(context))
 
         for step, ix in zip(mission.definition.steps, range(len(mission.definition.steps))):
             try:

@@ -12,10 +12,47 @@ from pydantic import Field
 from pydantic import model_validator
 from typing_extensions import Self
 
-from .datatypes import MissionDefinition
-from .datatypes import MissionTask
+from .datatypes import (
+    StepsList, MissionStepSetData, MissionStepPoseWaypoint, MissionStepRunAction, MissionStepWait, MissionStepWaitUntil, MissionStepIf,
+    MissionTask, MissionStep, MissionDefinition
+)
 
+class MissionTasksExtractor:
+    """
+    Visitor for mission steps that collects the tasks to be executed.
+    """
+    def __init__(self):
+        self._tasks_list: List[MissionTask] = []
 
+    def extract_tasks(self, steps: StepsList) -> List[MissionTask]:
+        for step in steps:
+            step.accept(self)
+        return self._tasks_list
+
+    def collect_step(self, step: MissionStep):
+        if step.complete_task is not None:
+            self._tasks_list.append(MissionTask(taskId=step.complete_task, label=step.complete_task))
+
+    def visit_set_data(self, step: MissionStepSetData):
+        self.collect_step(step)
+
+    def visit_pose_waypoint(self, step: MissionStepPoseWaypoint):
+        self.collect_step(step)
+
+    def visit_run_action(self, step: MissionStepRunAction):
+        self.collect_step(step)
+
+    def visit_wait(self, step: MissionStepWait):
+        self.collect_step(step)
+
+    def visit_wait_until(self, step: MissionStepWaitUntil):
+        self.collect_step(step)
+
+    def visit_if(self, step: MissionStepIf):
+        self.collect_step(step)
+        self.extract_tasks(step.then)
+        if step.else_ is not None:
+            self.extract_tasks(step.else_)
 class Mission(BaseModel):
     """
     Represents a (parsed) mission. It includes the definition, the runtime arguments and tasks.
@@ -37,12 +74,8 @@ class Mission(BaseModel):
         pass
 
     def _build_tasks(self, mission_definition: MissionDefinition) -> List[MissionTask]:
-        tasks = [
-            MissionTask(taskId=s.complete_task, label=s.complete_task)
-            for s in mission_definition.steps
-            if s.complete_task is not None
-        ]
-        return tasks
+        extractor = MissionTasksExtractor()
+        return extractor.extract_tasks(mission_definition.steps)
 
     def find_task(self, task_id):
         return next((task for task in self.tasks_list if task.task_id == task_id), None)
