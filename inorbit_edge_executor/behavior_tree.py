@@ -26,6 +26,7 @@ from datetime import datetime
 from typing import Dict
 from typing import List
 from typing import Union
+from typing import Callable
 
 from async_timeout import timeout
 
@@ -1111,46 +1112,15 @@ class NodeFromStepBuilder:
                 self.waypoint_distance_tolerance = float(args[WAYPOINT_DISTANCE_TOLERANCE])
             if WAYPOINT_ANGULAR_TOLERANCE in args:
                 self.waypoint_angular_tolerance = float(args[WAYPOINT_ANGULAR_TOLERANCE])
+        def default_step_wrapper_fn(step: MissionStep, node: BehaviorTree) -> BehaviorTree:
+            return node
+        self._step_wrapper_fn = default_step_wrapper_fn
+
+    def set_step_wrapper(self, step_wrapper_fn: Callable[[MissionStep, BehaviorTree], BehaviorTree]):
+        self._step_wrapper_fn = step_wrapper_fn
 
     def _wrap_step_node(self, step: MissionStep, core_node: BehaviorTree) -> BehaviorTreeSequential:
-        """
-        Wraps a core step node with lock robot, timeout, and task tracking nodes.
-        Returns a BehaviorTreeSequential containing all necessary nodes for the step.
-        """
-        sequential = BehaviorTreeSequential(label=step.label)
-
-        # Always add lock robot node before the step
-        sequential.add_node(LockRobotNode(self.context, label="lock robot"))
-
-        # Add task started node if complete_task is set
-        if step.complete_task is not None:
-            sequential.add_node(
-                TaskStartedNode(
-                    self.context,
-                    step.complete_task,
-                    label=f"report task {step.complete_task} started",
-                )
-            )
-
-        # Wrap core node in TimeoutNode if timeout_secs is set and node is not already WaitNode or TimeoutNode
-        if step.timeout_secs is not None and type(core_node) not in (WaitNode, TimeoutNode):
-            core_node = TimeoutNode(step.timeout_secs, core_node, label=f"timeout for {step.label}")
-
-        # Add the core node (possibly wrapped in TimeoutNode)
-        if core_node:
-            sequential.add_node(core_node)
-
-        # Add task completed node if complete_task is set
-        if step.complete_task is not None:
-            sequential.add_node(
-                TaskCompletedNode(
-                    self.context,
-                    step.complete_task,
-                    label=f"report task {step.complete_task} completed",
-                )
-            )
-
-        return sequential
+        return self._step_wrapper_fn(step, core_node)
 
     def visit_wait(self, step: MissionStepWait):
         core_node = WaitNode(self.context, step.timeout_secs, label=step.label)
@@ -1362,14 +1332,56 @@ class DefaultTreeBuilder(TreeBuilder):
             step_builder_factory if step_builder_factory else NodeFromStepBuilder
         )
 
+    def _build_step_wrapper_for_context(self, context: BehaviorTreeBuilderContext) -> Callable[[MissionStep, BehaviorTree], BehaviorTreeSequential]:
+        def _step_wrapper_fn(step: MissionStep, core_node: BehaviorTree) -> BehaviorTreeSequential:
+            """
+            Wraps a step node with lock robot, timeout, and task tracking nodes.
+            Returns a BehaviorTreeSequential containing all necessary nodes for the step.
+            """
+            sequential = BehaviorTreeSequential(label=step.label)
+
+            # Always add lock robot node before the step
+            sequential.add_node(LockRobotNode(context, label="lock robot"))
+
+            # Add task started node if complete_task is set
+            if step.complete_task is not None:
+                sequential.add_node(
+                    TaskStartedNode(
+                        context,
+                        step.complete_task,
+                        label=f"report task {step.complete_task} started",
+                    )
+                )
+
+            # Wrap core node in TimeoutNode if timeout_secs is set and node is not already WaitNode or TimeoutNode
+            if step.timeout_secs is not None and type(core_node) not in (WaitNode, TimeoutNode):
+                core_node = TimeoutNode(step.timeout_secs, core_node, label=f"timeout for {step.label}")
+
+            # Add the core node (possibly wrapped in TimeoutNode)
+            if core_node:
+                sequential.add_node(core_node)
+
+            # Add task completed node if complete_task is set
+            if step.complete_task is not None:
+                sequential.add_node(
+                    TaskCompletedNode(
+                        context,
+                        step.complete_task,
+                        label=f"report task {step.complete_task} completed",
+                    )
+                )
+
+            return sequential
+        return _step_wrapper_fn
+
     def build_tree_for_mission(self, context: BehaviorTreeBuilderContext) -> BehaviorTree:
         mission = context.mission
         tree = BehaviorTreeSequential(label=f"mission {mission.id}")
         tree.add_node(MissionInProgressNode(context, label="mission start"))
         step_builder = self._step_builder_factory(context)
+        step_builder.set_step_wrapper(self._build_step_wrapper_for_context(context))
 
         for step, ix in zip(mission.definition.steps, range(len(mission.definition.steps))):
-            # TODO build the right kind of behavior node
             try:
                 node = step.accept(step_builder)
             except Exception as e:  # TODO
