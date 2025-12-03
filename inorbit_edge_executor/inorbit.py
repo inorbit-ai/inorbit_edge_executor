@@ -378,7 +378,6 @@ class MissionTrackingAPI(MissionTrackingMission):
             current_task_id = self._find_current_task_id()
             if current_task_id:
                 req["currentTaskId"] = current_task_id
-            print(f"Reporting tasks: {req}")
             await self._api.put(build_mission_api_path(self.id), req)
             return True
         except Exception as e:
