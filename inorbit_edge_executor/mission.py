@@ -13,14 +13,24 @@ from pydantic import model_validator
 from typing_extensions import Self
 
 from .datatypes import (
-    StepsList, MissionStepSetData, MissionStepPoseWaypoint, MissionStepRunAction, MissionStepWait, MissionStepWaitUntil, MissionStepIf,
-    MissionTask, MissionStep, MissionDefinition
+    StepsList,
+    MissionStepSetData,
+    MissionStepPoseWaypoint,
+    MissionStepRunAction,
+    MissionStepWait,
+    MissionStepWaitUntil,
+    MissionStepIf,
+    MissionTask,
+    MissionStep,
+    MissionDefinition,
 )
+
 
 class MissionTasksExtractor:
     """
     Helper class that visits mission steps and collects the tasks to be executed.
     """
+
     def __init__(self):
         self._tasks_list: List[MissionTask] = []
 
@@ -31,7 +41,9 @@ class MissionTasksExtractor:
 
     def collect_step(self, step: MissionStep):
         if step.complete_task is not None:
-            self._tasks_list.append(MissionTask(taskId=step.complete_task, label=step.complete_task))
+            self._tasks_list.append(
+                MissionTask(taskId=step.complete_task, label=step.complete_task)
+            )
 
     def visit_set_data(self, step: MissionStepSetData):
         self.collect_step(step)
