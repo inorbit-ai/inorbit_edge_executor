@@ -139,59 +139,67 @@ async def main():
         definition=MissionDefinition(
             label="A mission definition",
             steps=[
-                MissionStepSetData.model_validate({
-                    "label": "set some data",
-                    "completeTask": "step 0",
-                    "data": {"key": "value"},
-                }),
-                MissionStepSetData.model_validate({
-                    "label": "set more data",
-                    "completeTask": "step 1",
-                    "data": {"key2": "value2"},
-                }),
-                MissionStepPoseWaypoint.model_validate({
-                    "label": "go to waypoint",
-                    "completeTask": "step 2",
-                    "waypoint": {
-                        "x": 0,
-                        "y": 0,
-                        "theta": 0,
-                        "frameId": "map",
-                        "waypointId": "wp1",
-                    },
-                }),
-                MissionStepIf.model_validate({
-                    "label": "if",
-                    "if": {
-                        "expression": "0 > 1",
-                        "then": [
-                            {
-                                "label": "go to waypoint A",
-                                "completeTask": "step 3",
-                                "waypoint": {
-                                    "x": 0,
-                                    "y": 0,
-                                    "theta": 0,
-                                    "frameId": "map",
-                                    "waypointId": "wpA",
-                                },
-                            },
-                        ],
-                        "else": [
-                            {
-                                "label": "go to waypoint B",
-                                "completeTask": "step 4",
-                                "waypoint": {
-                                    "x": 0,
-                                    "y": 0,
-                                    "theta": 0,
-                                    "frameId": "map",
-                                    "waypointId": "wpB",
-                                },
-                            },
-                        ],
+                MissionStepSetData.model_validate(
+                    {
+                        "label": "set some data",
+                        "completeTask": "step 0",
+                        "data": {"key": "value"},
                     }
-                }),
+                ),
+                MissionStepSetData.model_validate(
+                    {
+                        "label": "set more data",
+                        "completeTask": "step 1",
+                        "data": {"key2": "value2"},
+                    }
+                ),
+                MissionStepPoseWaypoint.model_validate(
+                    {
+                        "label": "go to waypoint",
+                        "completeTask": "step 2",
+                        "waypoint": {
+                            "x": 0,
+                            "y": 0,
+                            "theta": 0,
+                            "frameId": "map",
+                            "waypointId": "wp1",
+                        },
+                    }
+                ),
+                MissionStepIf.model_validate(
+                    {
+                        "label": "if",
+                        "if": {
+                            "expression": "0 > 1",
+                            "then": [
+                                {
+                                    "label": "go to waypoint A",
+                                    "completeTask": "step 3",
+                                    "waypoint": {
+                                        "x": 0,
+                                        "y": 0,
+                                        "theta": 0,
+                                        "frameId": "map",
+                                        "waypointId": "wpA",
+                                    },
+                                },
+                            ],
+                            "else": [
+                                {
+                                    "label": "go to waypoint B",
+                                    "completeTask": "step 4",
+                                    "waypoint": {
+                                        "x": 0,
+                                        "y": 0,
+                                        "theta": 0,
+                                        "frameId": "map",
+                                        "waypointId": "wpB",
+                                    },
+                                },
+                            ],
+                        },
+                    }
+                ),
             ],
         ),
         arguments={"arg1": "value1"},
