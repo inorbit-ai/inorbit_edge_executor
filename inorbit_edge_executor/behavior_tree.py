@@ -757,6 +757,8 @@ class IfNode(BehaviorTree):
             else:
                 logger.debug(f"expression {self.expression} == false, no else branch, succeeding")
                 # No else branch, succeed (no-op)
+                self.state = NODE_STATE_SUCCESS
+                self.last_error = ""
 
     def reset_execution(self):
         super().reset_execution()
