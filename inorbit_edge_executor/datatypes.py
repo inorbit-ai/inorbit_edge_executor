@@ -59,6 +59,9 @@ class MissionStep(BaseModel):
     complete_task: str = Field(default=None, alias="completeTask")
     model_config = ConfigDict(extra="forbid")
 
+    def accept(self, visitor):
+        raise NotImplementedError("Subclasses must implement this method")
+
 
 class Target(BaseModel):
     """
