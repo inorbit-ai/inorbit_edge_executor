@@ -85,7 +85,7 @@ def test_bt_build_simple(inorbit_api):
                     "type": "MissionAbortedNode",
                     "state": "",
                     "label": "mission cancelled",
-                    "status": "OK",
+                    "status": "error",
                 },
                 {
                     "type": "UnlockRobotNode",

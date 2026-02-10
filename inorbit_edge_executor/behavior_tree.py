@@ -1422,7 +1422,7 @@ class DefaultTreeBuilder(TreeBuilder):
         on_error.add_node(UnlockRobotNode(context, label="unlock robot after mission abort"))
         on_cancel = BehaviorTreeSequential(label="cancel handlers")
         on_cancel.add_node(
-            MissionAbortedNode(context, status=MissionStatus.ok, label="mission cancelled")
+            MissionAbortedNode(context, status=MissionStatus.error, label="mission cancelled")
         )
         on_cancel.add_node(UnlockRobotNode(context, label="unlock robot after mission cancel"))
         on_pause = BehaviorTreeSequential(label="pause handlers")
