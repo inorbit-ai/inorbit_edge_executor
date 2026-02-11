@@ -6,6 +6,7 @@ datatypes
 
 Defines different types shared by various modules.
 """
+
 from enum import Enum
 from typing import Any
 from typing import Dict
