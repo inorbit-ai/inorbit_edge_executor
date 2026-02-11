@@ -73,6 +73,7 @@ class MissionState(Enum):
     completed = "completed"
     in_progress = "in-progress"
     paused = "paused"
+    aborted = "aborted"
     abandoned = "abandoned"
     starting = "starting"
 
@@ -349,10 +350,7 @@ class MissionTrackingAPI(MissionTrackingMission):
         """Marks the mission as Aborted in Mission Tracking API"""
         try:
             req = {
-                # NOTE(herchu) State could be "aborted" but we have not defined it in
-                # https://docs.google.com/document/d/16KxmbmkiKhZ1IU_zkorJzZscMWFU2FrIJoTlenM8gwY ,
-                # so until then we use the one currently mapped from Actionlib's "ABORTED=4"
-                "state": str(MissionState.abandoned),
+                "state": str(MissionState.aborted),
                 "inProgress": False,
                 "tasks": self._build_tasks_list(),
                 "status": str(status),
