@@ -112,8 +112,7 @@ class SqliteDB(WorkerPersistenceDB):
             # NOTE (Elvio): Creating a new table here and migrating data to it because
             # in sqlite it's not possible to create a new "NOT NULL" field on already existing
             # table (paused column)
-            await cursor.execute(
-                f"""
+            await cursor.execute(f"""
                 CREATE TABLE {temp_missions_table} (
                   "mission_id"	TEXT,
                   "state"	TEXT,
@@ -122,14 +121,11 @@ class SqliteDB(WorkerPersistenceDB):
                   "paused"	BOOL NOT NULL,
                   PRIMARY KEY("mission_id")
                 );
-            """
-            )
-            await cursor.execute(
-                f"""
+            """)
+            await cursor.execute(f"""
                 INSERT INTO {temp_missions_table} (mission_id, state, finished, robot_id, paused)
                 SELECT mission_id, state, finished, robot_id, 0 FROM {missions_table};
-            """
-            )
+            """)
             await cursor.execute(f"DROP TABLE {missions_table};")
             await cursor.execute(f"ALTER TABLE {temp_missions_table} RENAME TO {missions_table};")
             # Commit the changes
