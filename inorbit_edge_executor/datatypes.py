@@ -13,6 +13,8 @@ from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Union
+from pydantic import model_validator
+
 
 from pydantic import BaseModel
 from pydantic import ConfigDict
@@ -107,15 +109,43 @@ class MissionStepSetData(MissionStep):
         return MissionStepTypes.SET_DATA.value
 
 
+class EdgeTrajectoryNurbsParameters(BaseModel):
+    degree: int
+    knotVector: List[float]
+    controlPoints: List[Dict[str, float]]
+
+
+class EdgeTrajectory(BaseModel):
+    type: str  # "nurbs" or "line"
+    parameters: Optional[EdgeTrajectoryNurbsParameters] = Field(default=None)
+
+    @model_validator(mode="after")
+    def validate_parameters(self):
+        if self.type == "nurbs" and self.parameters is None:
+            raise ValueError("NURBS trajectory requires parameters")
+        if self.type != "nurbs" and self.parameters is not None:
+            raise ValueError(f'Trajectory type "{self.type}" must not include parameters')
+        return self
+
+
+class Edge(BaseModel):
+    trajectory: Optional[EdgeTrajectory] = Field(default=None)
+    properties: Optional[Dict[str, Optional[str]]] = Field(default=None)
+
+
 class MissionStepPoseWaypoint(MissionStep):
     """
     Mission step for navigating to a named waypoint.
 
     Note that like MissionStepNamedWaypoint, both are represented with a 'waypoint' field
     """
-
+    model_config = ConfigDict(extra="allow")
     waypoint: Pose
+    edge: Optional[Edge] = Field(default=None)
 
+    def accept(self, visitor):
+        return visitor.visit_pose_waypoint(self)
+    
     def get_type(self):
         return MissionStepTypes.POSE_WAYPOINT.value
 
@@ -251,7 +281,7 @@ class MissionDefinition(BaseModel):
     selector: Any = Field(
         default=None
     )  # Accepted from API just to complete schema in struct mode (and ignore the field)
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="allow")
 
 
 class MissionTask(BaseModel):
