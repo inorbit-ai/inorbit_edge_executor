@@ -134,7 +134,11 @@ def test_edge_trajectory_nurbs():
                 "parameters": {
                     "degree": 3,
                     "knotVector": [0.0, 0.0, 0.0, 1.0, 1.0, 1.0],
-                    "controlPoints": [{"x": 0.0, "y": 0.0}, {"x": 1.0, "y": 0.5}, {"x": 2.0, "y": 0.0}],
+                    "controlPoints": [
+                        {"x": 0.0, "y": 0.0},
+                        {"x": 1.0, "y": 0.5},
+                        {"x": 2.0, "y": 0.0},
+                    ],
                 },
             }
         }
