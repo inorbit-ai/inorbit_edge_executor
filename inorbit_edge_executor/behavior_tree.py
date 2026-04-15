@@ -619,7 +619,7 @@ class RunActionNode(BehaviorTree):
         if self.target is not None:
             object["target"] = self.target.dump_object()
         if self.edge is not None:
-            object["edge"] = self.edge.model_dump()
+            object["edge"] = self.edge.model_dump(by_alias=True)
         return object
 
     @classmethod

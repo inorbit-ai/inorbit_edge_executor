@@ -14,7 +14,6 @@ from inorbit_edge_executor.datatypes import (
     MissionStepPoseWaypoint,
 )
 
-
 # ---------------------------------------------------------------------------
 # EdgeCorridor
 # ---------------------------------------------------------------------------
@@ -268,3 +267,36 @@ def test_mission_definition_with_edge_step():
     assert isinstance(second, MissionStepPoseWaypoint)
     assert second.edge.edge_id == "e-start-end"
     assert second.edge.corridor.width == 2.0
+
+
+# ---------------------------------------------------------------------------
+# Edge — serialization (model_dump by_alias)
+# ---------------------------------------------------------------------------
+
+
+def test_edge_model_dump_uses_aliases():
+    """model_dump(by_alias=True) must produce JS-style camelCase keys so that
+    Edge.model_validate() can round-trip through the serialized dict."""
+    edge = Edge.model_validate(
+        {
+            "edgeId": "e-AB",
+            "startWaypointId": "A",
+            "endWaypointId": "B",
+            "bidirectional": True,
+            "trajectory": {"type": "line"},
+            "corridor": {"width": 2.0},
+            "properties": {"edge": {"maxSpeed": "2"}},
+        }
+    )
+
+    dumped = edge.model_dump(by_alias=True)
+    assert dumped["edgeId"] == "e-AB"
+    assert dumped["startWaypointId"] == "A"
+    assert dumped["endWaypointId"] == "B"
+    assert dumped["corridor"]["width"] == 2.0
+
+    # Round-trip: the serialized dict must be re-parseable
+    restored = Edge.model_validate(dumped)
+    assert restored.edge_id == "e-AB"
+    assert restored.corridor.width == 2.0
+    assert restored.properties["edge"]["maxSpeed"] == "2"
