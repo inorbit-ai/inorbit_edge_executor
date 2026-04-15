@@ -135,7 +135,7 @@ class EdgeCorridor(BaseModel):
 class Edge(BaseModel):
     routeId: str
     trajectory: Optional[EdgeTrajectoryNurbsParameters] = Field(default=None)
-    corridor: Optional[EdgeCorridor] = Field(type=None)
+    corridor: Optional[EdgeCorridor]= Field(default=None)
     properties: Optional[Dict[str, Dict[str, Optional[str]]]] = Field(default=None)
 
 
