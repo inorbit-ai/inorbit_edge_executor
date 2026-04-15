@@ -1167,7 +1167,7 @@ class NodeFromStepBuilder:
                 )
             ),
             label=step.label,
-            edge=step.edge if step.edge else None,
+            edge=step.routeSegment if step.routeSegment else None,
         )
         expr = f"pose = getValue('pose'); theta = pose.theta; pose and pose.frameId == '{waypoint.frame_id}' and sqrt(pow(pose.x-{waypoint.x}, 2) + pow(pose.y-{waypoint.y}, 2)) < {self.waypoint_distance_tolerance} and abs(angularDistance(theta, {waypoint.theta})) < {self.waypoint_angular_tolerance}"
         wait_node = WaitExpressionNode(

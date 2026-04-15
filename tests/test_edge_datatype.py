@@ -185,24 +185,24 @@ def test_mission_step_pose_waypoint_with_full_edge():
                 "frameId": "map",
                 "waypointId": "A",
             },
-            "edge": {
+            "routeSegment": {
                 "edgeId": "e-AB",
                 "startWaypointId": "A",
                 "endWaypointId": "B",
                 "bidirectional": True,
                 "trajectory": {"type": "line"},
                 "corridor": {"width": 1.5},
-                "properties": {"edge": {"maxSpeed": "1.5"}},
+                "properties": {"routeSegment": {"maxSpeed": "1.5"}},
             },
         }
     )
-    assert step.edge.edge_id == "e-AB"
-    assert step.edge.start_waypoint_id == "A"
-    assert step.edge.end_waypoint_id == "B"
-    assert step.edge.bidirectional is True
-    assert step.edge.trajectory.type == "line"
-    assert step.edge.corridor.width == 1.5
-    assert step.edge.properties["edge"]["maxSpeed"] == "1.5"
+    assert step.routeSegment.edge_id == "e-AB"
+    assert step.routeSegment.start_waypoint_id == "A"
+    assert step.routeSegment.end_waypoint_id == "B"
+    assert step.routeSegment.bidirectional is True
+    assert step.routeSegment.trajectory.type == "line"
+    assert step.routeSegment.corridor.width == 1.5
+    assert step.routeSegment.properties["routeSegment"]["maxSpeed"] == "1.5"
 
 
 def test_mission_step_pose_waypoint_without_edge():
@@ -217,7 +217,7 @@ def test_mission_step_pose_waypoint_without_edge():
             }
         }
     )
-    assert step.edge is None
+    assert step.routeSegment is None
 
 
 # ---------------------------------------------------------------------------
@@ -263,10 +263,10 @@ def test_mission_definition_with_edge_step():
     assert len(definition.steps) == 2
     first, second = definition.steps
     assert isinstance(first, MissionStepPoseWaypoint)
-    assert first.edge is None
+    assert first.routeSegment is None
     assert isinstance(second, MissionStepPoseWaypoint)
-    assert second.edge.edge_id == "e-start-end"
-    assert second.edge.corridor.width == 2.0
+    assert second.routeSegment.edge_id == "e-start-end"
+    assert second.routeSegment.corridor.width == 2.0
 
 
 # ---------------------------------------------------------------------------

@@ -150,7 +150,7 @@ class MissionStepPoseWaypoint(MissionStep):
     """
     model_config = ConfigDict(extra="allow")
     waypoint: Pose
-    edge: Optional[Edge] = Field(default=None)
+    routeSegment: Optional[Edge] = Field(default=None)
 
     def accept(self, visitor):
         return visitor.visit_pose_waypoint(self)
