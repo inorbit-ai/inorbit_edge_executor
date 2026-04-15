@@ -133,10 +133,7 @@ class EdgeCorridor(BaseModel):
 
 
 class Edge(BaseModel):
-    edge_id: Optional[str] = Field(alias="edgeId", default=None)
-    start_waypoint_id: Optional[str] = Field(alias="startWaypointId", default=None)
-    end_waypoint_id: Optional[str] = Field(alias="endWaypointId", default=None)
-    bidirectional: Optional[bool] = Field(default=None)
+    routeId: str
     trajectory: Optional[EdgeTrajectory] = Field(default=None)
     corridor: Optional[EdgeCorridor] = Field(default=None)
     properties: Optional[Dict[str, Dict[str, Optional[str]]]] = Field(default=None)
