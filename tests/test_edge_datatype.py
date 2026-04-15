@@ -247,14 +247,14 @@ def test_mission_definition_with_edge_step():
                     "frameId": "map",
                     "waypointId": "end",
                 },
-                "edge": {
+                "routeSegment": {
                     "edgeId": "e-start-end",
                     "startWaypointId": "start",
                     "endWaypointId": "end",
                     "bidirectional": False,
                     "trajectory": {"type": "line"},
                     "corridor": {"width": 2.0},
-                    "properties": {"edge": {"maxSpeed": "2"}},
+                    "properties": {"routeSegment": {"maxSpeed": "2"}},
                 },
                 "label": "End",
             },
