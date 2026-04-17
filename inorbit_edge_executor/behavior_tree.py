@@ -27,7 +27,6 @@ from typing import Dict
 from typing import List
 from typing import Union
 from typing import Callable
-from .datatypes import Edge
 
 from async_timeout import timeout
 
@@ -563,7 +562,6 @@ class RunActionNode(BehaviorTree):
         target: Target = None,
         max_retries: int = 3,
         retry_wait_seconds: float = 5.0,
-        edge: Edge = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -577,7 +575,6 @@ class RunActionNode(BehaviorTree):
             self.robot = context.robot_api
         else:
             self.robot = context.robot_api_factory.build(self.target.robot_id)
-        self.edge = edge
 
     async def _execute(self):
         arguments = await self.mt.resolve_arguments(self.arguments)
@@ -618,8 +615,6 @@ class RunActionNode(BehaviorTree):
         object["retry_wait_seconds"] = self.retry_wait_seconds
         if self.target is not None:
             object["target"] = self.target.dump_object()
-        if self.edge is not None:
-            object["edge"] = self.edge.model_dump(by_alias=True)
         return object
 
     @classmethod
@@ -631,15 +626,12 @@ class RunActionNode(BehaviorTree):
         target=None,
         max_retries=3,
         retry_wait_seconds=5.0,
-        edge=None,
         **kwargs,
     ):
         if target is not None:
             target = Target.from_object(**target)
-        if edge is not None:
-            edge = Edge.model_validate(edge)
         return RunActionNode(
-            context, action_id, arguments, target, max_retries, retry_wait_seconds, edge, **kwargs
+            context, action_id, arguments, target, max_retries, retry_wait_seconds, **kwargs
         )
 
 
@@ -1155,19 +1147,21 @@ class NodeFromStepBuilder:
 
     def visit_pose_waypoint(self, step: MissionStepPoseWaypoint):
         waypoint = step.waypoint
+        arguments = dict(
+            pose=dict(
+                x=waypoint.x,
+                y=waypoint.y,
+                theta=waypoint.theta,
+                frameId=waypoint.frame_id,
+            ),
+        )
+        if step.routeSegment:
+            arguments["routeSegment"] = step.routeSegment.model_dump()
         go_node = RunActionNode(
             context=self.context,
             action_id=ACTION_NAVIGATE_TO_ID,
-            arguments=dict(
-                pose=dict(
-                    x=waypoint.x,
-                    y=waypoint.y,
-                    theta=waypoint.theta,
-                    frameId=waypoint.frame_id,
-                )
-            ),
+            arguments=arguments,
             label=step.label,
-            edge=step.routeSegment if step.routeSegment else None,
         )
         expr = f"pose = getValue('pose'); theta = pose.theta; pose and pose.frameId == '{waypoint.frame_id}' and sqrt(pow(pose.x-{waypoint.x}, 2) + pow(pose.y-{waypoint.y}, 2)) < {self.waypoint_distance_tolerance} and abs(angularDistance(theta, {waypoint.theta})) < {self.waypoint_angular_tolerance}"
         wait_node = WaitExpressionNode(
