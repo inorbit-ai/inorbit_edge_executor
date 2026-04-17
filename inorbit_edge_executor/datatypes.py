@@ -112,7 +112,6 @@ class EdgeTrajectoryNurbsParameters(BaseModel):
     controlPoints: List[Dict[str, float]]
 
 
-
 class EdgeCorridor(BaseModel):
     width: float
 
@@ -120,7 +119,7 @@ class EdgeCorridor(BaseModel):
 class Edge(BaseModel):
     routeId: str
     trajectory: Optional[EdgeTrajectoryNurbsParameters] = Field(default=None)
-    corridor: Optional[EdgeCorridor]= Field(default=None)
+    corridor: Optional[EdgeCorridor] = Field(default=None)
     properties: Optional[Dict[str, Dict[str, Optional[str]]]] = Field(default=None)
 
 
@@ -130,13 +129,14 @@ class MissionStepPoseWaypoint(MissionStep):
 
     Note that like MissionStepNamedWaypoint, both are represented with a 'waypoint' field
     """
+
     model_config = ConfigDict(extra="allow")
     waypoint: Pose
     routeSegment: Optional[Edge] = Field(default=None)
 
     def accept(self, visitor):
         return visitor.visit_pose_waypoint(self)
-    
+
     def get_type(self):
         return MissionStepTypes.POSE_WAYPOINT.value
 

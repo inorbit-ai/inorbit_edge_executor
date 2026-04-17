@@ -32,7 +32,6 @@ from .mission import Mission
 from .worker import Worker
 from .datatypes import MissionStep
 
-
 logger = setup_logger(name="WorkerPool")
 
 
@@ -245,25 +244,22 @@ class WorkerPool:
             context.mt = MissionTrackingAPI(mission, self._api)
 
     def translate_mission(self, mission: Mission) -> Mission:
-
         """
         Performs any necessary translation from a mission (from its definition coming
         from InOrbit) to one that the current connector can execute.
 
         By default, iterates over all steps and calls translate_step() on each one.
- 
+
         Connectors that need cross-step logic should override this method entirely instead.
 
         The resulting MissionDefinition can include non-standard MissionSteps.
         """
-        mission.definition.steps = [
-            self.translate_step(step) for step in mission.definition.steps
-        ]
+        mission.definition.steps = [self.translate_step(step) for step in mission.definition.steps]
         return mission
 
     def translate_step(self, step: MissionStep) -> MissionStep:
         """
-        Translates a single mission step. 
+        Translates a single mission step.
 
         Override this in connector subclasses to transform individual steps without
         having to iterate over the mission manually.
