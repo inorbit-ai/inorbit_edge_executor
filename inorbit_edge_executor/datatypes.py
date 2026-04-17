@@ -13,9 +13,6 @@ from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Union
-from pydantic import model_validator
-
-
 from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
@@ -114,18 +111,6 @@ class EdgeTrajectoryNurbsParameters(BaseModel):
     knotVector: List[float]
     controlPoints: List[Dict[str, float]]
 
-
-class EdgeTrajectory(BaseModel):
-    type: str  # "nurbs" or "line"
-    parameters: Optional[EdgeTrajectoryNurbsParameters] = Field(default=None)
-
-    @model_validator(mode="after")
-    def validate_parameters(self):
-        if self.type == "nurbs" and self.parameters is None:
-            raise ValueError("NURBS trajectory requires parameters")
-        if self.type != "nurbs" and self.parameters is not None:
-            raise ValueError(f'Trajectory type "{self.type}" must not include parameters')
-        return self
 
 
 class EdgeCorridor(BaseModel):

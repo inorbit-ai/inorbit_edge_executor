@@ -8,7 +8,6 @@ from pydantic import ValidationError
 from inorbit_edge_executor.datatypes import (
     Edge,
     EdgeCorridor,
-    EdgeTrajectory,
     EdgeTrajectoryNurbsParameters,
     MissionDefinition,
     MissionStepPoseWaypoint,
@@ -30,152 +29,113 @@ def test_edge_corridor_requires_width():
 
 
 # ---------------------------------------------------------------------------
-# Edge — field presence and aliases
+# Edge — field presence
 # ---------------------------------------------------------------------------
 
 
-def test_edge_all_fields_from_js_resolver():
-    """Full edge object as produced by the JS EdgeExecutor resolver."""
+def test_edge_all_fields():
     edge = Edge(
         **{
-            "edgeId": "e-AB",
-            "startWaypointId": "A",
-            "endWaypointId": "B",
-            "bidirectional": True,
-            "trajectory": {"type": "line"},
+            "routeId": "route-AB",
+            "trajectory": {
+                "degree": 3,
+                "knotVector": [0.0, 0.0, 0.0, 1.0, 1.0, 1.0],
+                "controlPoints": [
+                    {"x": 0.0, "y": 0.0},
+                    {"x": 1.0, "y": 0.5},
+                    {"x": 2.0, "y": 0.0},
+                ],
+            },
             "corridor": {"width": 2.0},
-            "properties": {"edge": {"maxSpeed": "2"}},
+            "properties": {"routeSegment": {"maxSpeed": "2"}},
         }
     )
-    assert edge.edge_id == "e-AB"
-    assert edge.start_waypoint_id == "A"
-    assert edge.end_waypoint_id == "B"
-    assert edge.bidirectional is True
-    assert edge.trajectory.type == "line"
+    assert edge.routeId == "route-AB"
+    assert edge.trajectory.degree == 3
     assert edge.corridor.width == 2.0
-    assert edge.properties == {"edge": {"maxSpeed": "2"}}
+    assert edge.properties == {"routeSegment": {"maxSpeed": "2"}}
 
 
-def test_edge_all_fields_optional():
-    """Edge with no fields set is valid."""
-    edge = Edge()
-    assert edge.edge_id is None
-    assert edge.start_waypoint_id is None
-    assert edge.end_waypoint_id is None
-    assert edge.bidirectional is None
+def test_edge_optional_fields_default_to_none():
+    edge = Edge(routeId="route-1")
     assert edge.trajectory is None
     assert edge.corridor is None
     assert edge.properties is None
 
 
 def test_edge_partial_fields():
-    edge = Edge(**{"edgeId": "e-XY", "bidirectional": False})
-    assert edge.edge_id == "e-XY"
-    assert edge.bidirectional is False
+    edge = Edge(**{"routeId": "route-XY", "corridor": {"width": 1.5}})
+    assert edge.routeId == "route-XY"
+    assert edge.corridor.width == 1.5
     assert edge.trajectory is None
-    assert edge.corridor is None
+    assert edge.properties is None
+
+
+def test_edge_requires_route_id():
+    with pytest.raises(ValidationError):
+        Edge()
 
 
 # ---------------------------------------------------------------------------
-# Edge — properties shape (Issue 2)
+# Edge — properties shape
 # ---------------------------------------------------------------------------
 
 
 def test_edge_properties_nested_dict():
-    """properties is Dict[str, Dict[str, Optional[str]]] — nested structure from annotation schema."""
     edge = Edge(
         **{
+            "routeId": "route-1",
             "properties": {
-                "edge": {"maxSpeed": "2", "someOtherProp": "value", "nullableProp": None}
-            }
+                "routeSegment": {"maxSpeed": "2", "someOtherProp": "value", "nullableProp": None}
+            },
         }
     )
-    assert edge.properties["edge"]["maxSpeed"] == "2"
-    assert edge.properties["edge"]["someOtherProp"] == "value"
-    assert edge.properties["edge"]["nullableProp"] is None
-
-
-def test_edge_properties_multiple_namespaces():
-    edge = Edge(
-        **{
-            "properties": {
-                "edge": {"maxSpeed": "2"},
-                "node": {"someFlag": "true"},
-            }
-        }
-    )
-    assert edge.properties["edge"]["maxSpeed"] == "2"
-    assert edge.properties["node"]["someFlag"] == "true"
+    assert edge.properties["routeSegment"]["maxSpeed"] == "2"
+    assert edge.properties["routeSegment"]["someOtherProp"] == "value"
+    assert edge.properties["routeSegment"]["nullableProp"] is None
 
 
 def test_edge_properties_flat_dict_is_invalid():
-    """A flat Dict[str, str] was the old (broken) shape — it must now be rejected."""
     with pytest.raises(ValidationError):
-        Edge(**{"properties": {"maxSpeed": "2"}})
+        Edge(**{"routeId": "route-1", "properties": {"maxSpeed": "2"}})
 
 
 # ---------------------------------------------------------------------------
-# Edge — trajectory variants
+# Edge — trajectory
 # ---------------------------------------------------------------------------
 
 
-def test_edge_trajectory_line():
-    edge = Edge(**{"trajectory": {"type": "line"}})
-    assert edge.trajectory.type == "line"
-    assert edge.trajectory.parameters is None
+def test_edge_trajectory_null_means_straight_line():
+    edge = Edge(**{"routeId": "route-1"})
+    assert edge.trajectory is None
 
 
 def test_edge_trajectory_nurbs():
     edge = Edge(
         **{
+            "routeId": "route-1",
             "trajectory": {
-                "type": "nurbs",
-                "parameters": {
-                    "degree": 3,
-                    "knotVector": [0.0, 0.0, 0.0, 1.0, 1.0, 1.0],
-                    "controlPoints": [
-                        {"x": 0.0, "y": 0.0},
-                        {"x": 1.0, "y": 0.5},
-                        {"x": 2.0, "y": 0.0},
-                    ],
-                },
-            }
+                "degree": 3,
+                "knotVector": [0.0, 0.0, 0.0, 1.0, 1.0, 1.0],
+                "controlPoints": [
+                    {"x": 0.0, "y": 0.0},
+                    {"x": 1.0, "y": 0.5},
+                    {"x": 2.0, "y": 0.0},
+                ],
+            },
         }
     )
-    assert edge.trajectory.type == "nurbs"
-    assert edge.trajectory.parameters.degree == 3
-    assert len(edge.trajectory.parameters.knotVector) == 6
-    assert len(edge.trajectory.parameters.controlPoints) == 3
-
-
-def test_edge_trajectory_nurbs_missing_parameters_is_invalid():
-    with pytest.raises(ValidationError):
-        Edge(**{"trajectory": {"type": "nurbs"}})
-
-
-def test_edge_trajectory_line_with_parameters_is_invalid():
-    with pytest.raises(ValidationError):
-        Edge(
-            **{
-                "trajectory": {
-                    "type": "line",
-                    "parameters": {
-                        "degree": 3,
-                        "knotVector": [0.0, 1.0],
-                        "controlPoints": [{"x": 0.0, "y": 0.0}],
-                    },
-                }
-            }
-        )
+    assert edge.trajectory.degree == 3
+    assert len(edge.trajectory.knotVector) == 6
+    assert len(edge.trajectory.controlPoints) == 3
 
 
 # ---------------------------------------------------------------------------
-# MissionStepPoseWaypoint with a full edge
+# MissionStepPoseWaypoint with routeSegment
 # ---------------------------------------------------------------------------
 
 
-def test_mission_step_pose_waypoint_with_full_edge():
-    """End-to-end: step as received after JS EdgeExecutor resolution."""
+def test_mission_step_pose_waypoint_with_full_route_segment():
     step = MissionStepPoseWaypoint(
         **{
             "waypoint": {
@@ -186,26 +146,28 @@ def test_mission_step_pose_waypoint_with_full_edge():
                 "waypointId": "A",
             },
             "routeSegment": {
-                "edgeId": "e-AB",
-                "startWaypointId": "A",
-                "endWaypointId": "B",
-                "bidirectional": True,
-                "trajectory": {"type": "line"},
+                "routeId": "route-AB",
+                "trajectory": {
+                    "degree": 3,
+                    "knotVector": [0.0, 0.0, 0.0, 1.0, 1.0, 1.0],
+                    "controlPoints": [
+                        {"x": 0.0, "y": 0.0},
+                        {"x": 1.0, "y": 0.5},
+                        {"x": 2.0, "y": 0.0},
+                    ],
+                },
                 "corridor": {"width": 1.5},
                 "properties": {"routeSegment": {"maxSpeed": "1.5"}},
             },
         }
     )
-    assert step.routeSegment.edge_id == "e-AB"
-    assert step.routeSegment.start_waypoint_id == "A"
-    assert step.routeSegment.end_waypoint_id == "B"
-    assert step.routeSegment.bidirectional is True
-    assert step.routeSegment.trajectory.type == "line"
+    assert step.routeSegment.routeId == "route-AB"
+    assert step.routeSegment.trajectory.degree == 3
     assert step.routeSegment.corridor.width == 1.5
     assert step.routeSegment.properties["routeSegment"]["maxSpeed"] == "1.5"
 
 
-def test_mission_step_pose_waypoint_without_edge():
+def test_mission_step_pose_waypoint_without_route_segment():
     step = MissionStepPoseWaypoint(
         **{
             "waypoint": {
@@ -225,7 +187,7 @@ def test_mission_step_pose_waypoint_without_edge():
 # ---------------------------------------------------------------------------
 
 
-def test_mission_definition_with_edge_step():
+def test_mission_definition_with_route_segment_step():
     definition = MissionDefinition(
         label="Test mission",
         steps=[
@@ -248,11 +210,8 @@ def test_mission_definition_with_edge_step():
                     "waypointId": "end",
                 },
                 "routeSegment": {
-                    "edgeId": "e-start-end",
-                    "startWaypointId": "start",
-                    "endWaypointId": "end",
-                    "bidirectional": False,
-                    "trajectory": {"type": "line"},
+                    "routeId": "route-start-end",
+                    "trajectory": None,
                     "corridor": {"width": 2.0},
                     "properties": {"routeSegment": {"maxSpeed": "2"}},
                 },
@@ -265,38 +224,31 @@ def test_mission_definition_with_edge_step():
     assert isinstance(first, MissionStepPoseWaypoint)
     assert first.routeSegment is None
     assert isinstance(second, MissionStepPoseWaypoint)
-    assert second.routeSegment.edge_id == "e-start-end"
+    assert second.routeSegment.routeId == "route-start-end"
     assert second.routeSegment.corridor.width == 2.0
 
 
 # ---------------------------------------------------------------------------
-# Edge — serialization (model_dump by_alias)
+# Edge — serialization round-trip
 # ---------------------------------------------------------------------------
 
 
-def test_edge_model_dump_uses_aliases():
-    """model_dump(by_alias=True) must produce JS-style camelCase keys so that
-    Edge.model_validate() can round-trip through the serialized dict."""
+def test_edge_model_dump_round_trip():
     edge = Edge.model_validate(
         {
-            "edgeId": "e-AB",
-            "startWaypointId": "A",
-            "endWaypointId": "B",
-            "bidirectional": True,
-            "trajectory": {"type": "line"},
+            "routeId": "route-AB",
+            "trajectory": {
+                "degree": 3,
+                "knotVector": [0.0, 0.0, 0.0, 1.0, 1.0, 1.0],
+                "controlPoints": [{"x": 0.0, "y": 0.0}, {"x": 2.0, "y": 0.0}],
+            },
             "corridor": {"width": 2.0},
-            "properties": {"edge": {"maxSpeed": "2"}},
+            "properties": {"routeSegment": {"maxSpeed": "2"}},
         }
     )
 
-    dumped = edge.model_dump(by_alias=True)
-    assert dumped["edgeId"] == "e-AB"
-    assert dumped["startWaypointId"] == "A"
-    assert dumped["endWaypointId"] == "B"
-    assert dumped["corridor"]["width"] == 2.0
-
-    # Round-trip: the serialized dict must be re-parseable
+    dumped = edge.model_dump()
     restored = Edge.model_validate(dumped)
-    assert restored.edge_id == "e-AB"
+    assert restored.routeId == "route-AB"
     assert restored.corridor.width == 2.0
-    assert restored.properties["edge"]["maxSpeed"] == "2"
+    assert restored.trajectory.degree == 3
