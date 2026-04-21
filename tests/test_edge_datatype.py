@@ -28,6 +28,28 @@ def test_edge_corridor_requires_width():
         RouteSegmentCorridor()
 
 
+def test_edge_corridor_asymmetric():
+    corridor = RouteSegmentCorridor(leftWidth=1.0, rightWidth=0.5)
+    assert corridor.leftWidth == 1.0
+    assert corridor.rightWidth == 0.5
+    assert corridor.width is None
+
+
+def test_edge_corridor_left_without_right_fails():
+    with pytest.raises(ValidationError):
+        RouteSegmentCorridor(leftWidth=1.0)
+
+
+def test_edge_corridor_right_without_left_fails():
+    with pytest.raises(ValidationError):
+        RouteSegmentCorridor(rightWidth=1.0)
+
+
+def test_edge_corridor_asymmetric_with_symmetric_fails():
+    with pytest.raises(ValidationError):
+        RouteSegmentCorridor(width=1.0, leftWidth=0.5, rightWidth=0.5)
+
+
 # ---------------------------------------------------------------------------
 # RouteSegment — field presence
 # ---------------------------------------------------------------------------
