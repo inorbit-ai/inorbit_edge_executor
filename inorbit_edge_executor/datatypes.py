@@ -16,6 +16,7 @@ from typing import Union
 from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
+from pydantic import model_validator
 
 
 class MissionTrackingTypes(Enum):
@@ -111,9 +112,21 @@ class EdgeTrajectoryNurbsParameters(BaseModel):
     knotVector: List[float]
     controlPoints: List[Dict[str, float]]
 
-
 class EdgeCorridor(BaseModel):
-    width: float
+    width: Optional[float] = Field(default=None)
+    rightWidth: Optional[float] = Field(default=None)
+    leftWidth: Optional[float] = Field(default=None)
+
+    @model_validator(mode="after")
+    def validate(self):
+        if self.leftWidth is not None and self.rightWidth is not None:
+            if self.width is not None:
+                raise ValueError("width cannot be specified if leftWidth and rightWidth are provided")
+        if (self.leftWidth is not None) != (self.rightWidth is not None):
+            raise ValueError("you have to specify both leftWidth and rightWidth")
+        if self.width is None and self.leftWidth is None and self.rightWidth is None:
+            raise ValueError("you have to specify either width or both leftWidth and rightWidth")
+        return self
 
 
 class Edge(BaseModel):
