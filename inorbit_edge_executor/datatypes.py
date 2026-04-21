@@ -107,12 +107,13 @@ class MissionStepSetData(MissionStep):
         return MissionStepTypes.SET_DATA.value
 
 
-class EdgeTrajectoryNurbsParameters(BaseModel):
+class RouteSegmentTrajectoryNurbsParameters(BaseModel):
     degree: int
     knotVector: List[float]
     controlPoints: List[Dict[str, float]]
 
-class EdgeCorridor(BaseModel):
+
+class RouteSegmentCorridor(BaseModel):
     width: Optional[float] = Field(default=None)
     rightWidth: Optional[float] = Field(default=None)
     leftWidth: Optional[float] = Field(default=None)
@@ -121,7 +122,9 @@ class EdgeCorridor(BaseModel):
     def validate(self):
         if self.leftWidth is not None and self.rightWidth is not None:
             if self.width is not None:
-                raise ValueError("width cannot be specified if leftWidth and rightWidth are provided")
+                raise ValueError(
+                    "width cannot be specified if leftWidth and rightWidth are provided"
+                )
         if (self.leftWidth is not None) != (self.rightWidth is not None):
             raise ValueError("you have to specify both leftWidth and rightWidth")
         if self.width is None and self.leftWidth is None and self.rightWidth is None:
@@ -129,10 +132,10 @@ class EdgeCorridor(BaseModel):
         return self
 
 
-class Edge(BaseModel):
+class RouteSegment(BaseModel):
     routeId: str
-    trajectory: Optional[EdgeTrajectoryNurbsParameters] = Field(default=None)
-    corridor: Optional[EdgeCorridor] = Field(default=None)
+    trajectory: Optional[RouteSegmentTrajectoryNurbsParameters] = Field(default=None)
+    corridor: Optional[RouteSegmentCorridor] = Field(default=None)
     properties: Optional[Dict[str, Dict[str, Optional[str]]]] = Field(default=None)
 
 
@@ -145,7 +148,7 @@ class MissionStepPoseWaypoint(MissionStep):
 
     model_config = ConfigDict(extra="allow")
     waypoint: Pose
-    routeSegment: Optional[Edge] = Field(default=None)
+    routeSegment: Optional[RouteSegment] = Field(default=None)
 
     def accept(self, visitor):
         return visitor.visit_pose_waypoint(self)

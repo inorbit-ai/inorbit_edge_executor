@@ -6,35 +6,35 @@ import pytest
 from pydantic import ValidationError
 
 from inorbit_edge_executor.datatypes import (
-    Edge,
-    EdgeCorridor,
-    EdgeTrajectoryNurbsParameters,
+    RouteSegment,
+    RouteSegmentCorridor,
+    RouteSegmentTrajectoryNurbsParameters,
     MissionDefinition,
     MissionStepPoseWaypoint,
 )
 
 # ---------------------------------------------------------------------------
-# EdgeCorridor
+# RouteSegmentCorridor
 # ---------------------------------------------------------------------------
 
 
 def test_edge_corridor_basic():
-    corridor = EdgeCorridor(width=2.0)
+    corridor = RouteSegmentCorridor(width=2.0)
     assert corridor.width == 2.0
 
 
 def test_edge_corridor_requires_width():
     with pytest.raises(ValidationError):
-        EdgeCorridor()
+        RouteSegmentCorridor()
 
 
 # ---------------------------------------------------------------------------
-# Edge — field presence
+# RouteSegment — field presence
 # ---------------------------------------------------------------------------
 
 
 def test_edge_all_fields():
-    edge = Edge(
+    route_segment = RouteSegment(
         **{
             "routeId": "route-AB",
             "trajectory": {
@@ -50,39 +50,39 @@ def test_edge_all_fields():
             "properties": {"routeSegment": {"maxSpeed": "2"}},
         }
     )
-    assert edge.routeId == "route-AB"
-    assert edge.trajectory.degree == 3
-    assert edge.corridor.width == 2.0
-    assert edge.properties == {"routeSegment": {"maxSpeed": "2"}}
+    assert route_segment.routeId == "route-AB"
+    assert route_segment.trajectory.degree == 3
+    assert route_segment.corridor.width == 2.0
+    assert route_segment.properties == {"routeSegment": {"maxSpeed": "2"}}
 
 
 def test_edge_optional_fields_default_to_none():
-    edge = Edge(routeId="route-1")
-    assert edge.trajectory is None
-    assert edge.corridor is None
-    assert edge.properties is None
+    route_segment = RouteSegment(routeId="route-1")
+    assert route_segment.trajectory is None
+    assert route_segment.corridor is None
+    assert route_segment.properties is None
 
 
 def test_edge_partial_fields():
-    edge = Edge(**{"routeId": "route-XY", "corridor": {"width": 1.5}})
-    assert edge.routeId == "route-XY"
-    assert edge.corridor.width == 1.5
-    assert edge.trajectory is None
-    assert edge.properties is None
+    route_segment = RouteSegment(**{"routeId": "route-XY", "corridor": {"width": 1.5}})
+    assert route_segment.routeId == "route-XY"
+    assert route_segment.corridor.width == 1.5
+    assert route_segment.trajectory is None
+    assert route_segment.properties is None
 
 
 def test_edge_requires_route_id():
     with pytest.raises(ValidationError):
-        Edge()
+        RouteSegment()
 
 
 # ---------------------------------------------------------------------------
-# Edge — properties shape
+# RouteSegment — properties shape
 # ---------------------------------------------------------------------------
 
 
 def test_edge_properties_nested_dict():
-    edge = Edge(
+    route_segment = RouteSegment(
         **{
             "routeId": "route-1",
             "properties": {
@@ -90,28 +90,28 @@ def test_edge_properties_nested_dict():
             },
         }
     )
-    assert edge.properties["routeSegment"]["maxSpeed"] == "2"
-    assert edge.properties["routeSegment"]["someOtherProp"] == "value"
-    assert edge.properties["routeSegment"]["nullableProp"] is None
+    assert route_segment.properties["routeSegment"]["maxSpeed"] == "2"
+    assert route_segment.properties["routeSegment"]["someOtherProp"] == "value"
+    assert route_segment.properties["routeSegment"]["nullableProp"] is None
 
 
 def test_edge_properties_flat_dict_is_invalid():
     with pytest.raises(ValidationError):
-        Edge(**{"routeId": "route-1", "properties": {"maxSpeed": "2"}})
+        RouteSegment(**{"routeId": "route-1", "properties": {"maxSpeed": "2"}})
 
 
 # ---------------------------------------------------------------------------
-# Edge — trajectory
+# RouteSegment — trajectory
 # ---------------------------------------------------------------------------
 
 
 def test_edge_trajectory_null_means_straight_line():
-    edge = Edge(**{"routeId": "route-1"})
-    assert edge.trajectory is None
+    route_segment = RouteSegment(**{"routeId": "route-1"})
+    assert route_segment.trajectory is None
 
 
 def test_edge_trajectory_nurbs():
-    edge = Edge(
+    route_segment = RouteSegment(
         **{
             "routeId": "route-1",
             "trajectory": {
@@ -125,9 +125,9 @@ def test_edge_trajectory_nurbs():
             },
         }
     )
-    assert edge.trajectory.degree == 3
-    assert len(edge.trajectory.knotVector) == 6
-    assert len(edge.trajectory.controlPoints) == 3
+    assert route_segment.trajectory.degree == 3
+    assert len(route_segment.trajectory.knotVector) == 6
+    assert len(route_segment.trajectory.controlPoints) == 3
 
 
 # ---------------------------------------------------------------------------
@@ -229,12 +229,12 @@ def test_mission_definition_with_route_segment_step():
 
 
 # ---------------------------------------------------------------------------
-# Edge — serialization round-trip
+# RouteSegment — serialization round-trip
 # ---------------------------------------------------------------------------
 
 
 def test_edge_model_dump_round_trip():
-    edge = Edge.model_validate(
+    route_segment = RouteSegment.model_validate(
         {
             "routeId": "route-AB",
             "trajectory": {
@@ -247,8 +247,8 @@ def test_edge_model_dump_round_trip():
         }
     )
 
-    dumped = edge.model_dump()
-    restored = Edge.model_validate(dumped)
+    dumped = route_segment.model_dump()
+    restored = route_segment.model_validate(dumped)
     assert restored.routeId == "route-AB"
     assert restored.corridor.width == 2.0
     assert restored.trajectory.degree == 3

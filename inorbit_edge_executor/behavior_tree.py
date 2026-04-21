@@ -1154,7 +1154,7 @@ class NodeFromStepBuilder:
                 theta=waypoint.theta,
                 frameId=waypoint.frame_id,
             ),
-            **({"routeSegment": step.routeSegment.model_dump()} if step.routeSegment else {})
+            **({"routeSegment": step.routeSegment.model_dump()} if step.routeSegment else {}),
         )
         go_node = RunActionNode(
             context=self.context,
