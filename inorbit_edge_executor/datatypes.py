@@ -120,14 +120,13 @@ class RouteSegmentCorridor(BaseModel):
 
     @model_validator(mode="after")
     def validate(self):
-        if self.leftWidth is not None and self.rightWidth is not None:
-            if self.width is not None:
+        if all([self.leftWidth, self.rightWidth, self.width]):
                 raise ValueError(
                     "width cannot be specified if leftWidth and rightWidth are provided"
                 )
         if (self.leftWidth is not None) != (self.rightWidth is not None):
             raise ValueError("you have to specify both leftWidth and rightWidth")
-        if self.width is None and self.leftWidth is None and self.rightWidth is None:
+        if not any([self.leftWidth, self.rightWidth, self.width]):
             raise ValueError("you have to specify either width or both leftWidth and rightWidth")
         return self
 
