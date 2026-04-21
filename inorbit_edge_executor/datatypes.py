@@ -44,7 +44,7 @@ class Pose(BaseModel):
 
     x: float
     y: float
-    theta: float
+    theta: Optional[float] = Field(default=None)
     frame_id: Optional[str] = Field(alias="frameId", default=None)
     waypointId: str = Field(alias="waypointId", default=None)
 
