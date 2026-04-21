@@ -285,6 +285,7 @@ class MissionDefinition(BaseModel):
     selector: Any = Field(
         default=None
     )  # Accepted from API just to complete schema in struct mode (and ignore the field)
+    planner: Any = Field(default=None)
     model_config = ConfigDict(extra="forbid")
 
 

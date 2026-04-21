@@ -11,6 +11,7 @@ from inorbit_edge_executor.datatypes import (
     RouteSegmentTrajectoryNurbsParameters,
     MissionDefinition,
     MissionStepPoseWaypoint,
+    Pose,
 )
 
 # ---------------------------------------------------------------------------
@@ -248,6 +249,40 @@ def test_mission_definition_with_route_segment_step():
     assert isinstance(second, MissionStepPoseWaypoint)
     assert second.routeSegment.routeId == "route-start-end"
     assert second.routeSegment.corridor.width == 2.0
+
+
+# ---------------------------------------------------------------------------
+# Pose — optional theta
+# ---------------------------------------------------------------------------
+
+
+def test_pose_theta_optional():
+    pose = Pose(x=1.0, y=2.0, frameId="map")
+    assert pose.theta is None
+
+
+def test_pose_theta_when_provided():
+    pose = Pose(x=1.0, y=2.0, theta=1.57, frameId="map")
+    assert pose.theta == 1.57
+
+
+# ---------------------------------------------------------------------------
+# MissionDefinition — planner field
+# ---------------------------------------------------------------------------
+
+
+def test_mission_definition_accepts_planner_field():
+    definition = MissionDefinition(
+        label="test",
+        steps=[],
+        planner={"type": "graph", "options": {"allowFreePlanning": False}},
+    )
+    assert definition.planner == {"type": "graph", "options": {"allowFreePlanning": False}}
+
+
+def test_mission_definition_planner_defaults_to_none():
+    definition = MissionDefinition(label="test", steps=[])
+    assert definition.planner is None
 
 
 # ---------------------------------------------------------------------------

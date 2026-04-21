@@ -13,6 +13,7 @@ from inorbit_edge_executor.dummy_backend import DummyDB
 from inorbit_edge_executor.inorbit import InOrbitAPI
 from inorbit_edge_executor.inorbit import RobotApiFactory
 from inorbit_edge_executor.mission import Mission
+from inorbit_edge_executor.worker_pool import WorkerPool
 
 logger = getLogger("test-bt")
 
@@ -354,3 +355,62 @@ def test_bt_if_with_target():
     assert step_node["type"] == "IfNode"
     assert step_node["expression"] == "getValue('battery') > 50"
     assert step_node["target"]["robot_id"] == "robot456"
+
+
+def _build_waypoint_nodes(step_dict):
+    """Helper: build a tree with a single PoseWaypoint step and return (run_action_node, wait_node)."""
+    mission = Mission(
+        id="mission123",
+        robot_id="robot123",
+        definition=MissionDefinition(label="A mission", steps=[step_dict]),
+    )
+    context = BehaviorTreeBuilderContext()
+    context.mission = mission
+    context.options = MissionRuntimeOptions()
+    context.shared_memory = MissionRuntimeSharedMemory()
+    tree_obj = DefaultTreeBuilder().build_tree_for_mission(context).dump_object()
+    mission_sequential = tree_obj["children"][0]
+    step_wrap = mission_sequential["children"][1]
+    error_handler = step_wrap["children"][1]
+    waypoint_seq = error_handler["children"][0]
+    return waypoint_seq["children"][0], waypoint_seq["children"][1]
+
+
+def test_visit_pose_waypoint_route_segment_in_arguments():
+    run_node, _ = _build_waypoint_nodes(
+        {
+            "waypoint": {"x": 1.0, "y": 2.0, "theta": 0.0, "frameId": "map"},
+            "routeSegment": {"routeId": "route-1", "corridor": {"width": 1.5}},
+        }
+    )
+    assert "routeSegment" in run_node["arguments"]
+    assert run_node["arguments"]["routeSegment"]["routeId"] == "route-1"
+
+
+def test_visit_pose_waypoint_no_route_segment_excluded_from_arguments():
+    run_node, _ = _build_waypoint_nodes(
+        {"waypoint": {"x": 1.0, "y": 2.0, "theta": 0.0, "frameId": "map"}}
+    )
+    assert "routeSegment" not in run_node["arguments"]
+
+
+def test_visit_pose_waypoint_theta_none_skips_angular_distance():
+    _, wait_node = _build_waypoint_nodes({"waypoint": {"x": 1.0, "y": 2.0, "frameId": "map"}})
+    assert "angularDistance" not in wait_node["expression"]
+
+
+def test_visit_pose_waypoint_theta_set_includes_angular_distance():
+    _, wait_node = _build_waypoint_nodes(
+        {"waypoint": {"x": 1.0, "y": 2.0, "theta": 1.57, "frameId": "map"}}
+    )
+    assert "angularDistance" in wait_node["expression"]
+
+
+def test_translate_step_default_returns_step_unchanged(inorbit_api):
+    from inorbit_edge_executor.datatypes import MissionStepPoseWaypoint
+
+    worker_pool = WorkerPool(db=None, api=inorbit_api, behavior_tree_builder=DefaultTreeBuilder())
+    step = MissionStepPoseWaypoint.model_validate(
+        {"waypoint": {"x": 0.0, "y": 0.0, "theta": 0.0, "frameId": "map"}}
+    )
+    assert worker_pool.translate_step(step) is step
