@@ -30,6 +30,7 @@ from .inorbit import InOrbitAPI, MissionStatus, MissionTrackingAPI, RobotApiFact
 from .logger import setup_logger
 from .mission import Mission
 from .worker import Worker
+from .datatypes import MissionStep
 
 logger = setup_logger(name="WorkerPool")
 
@@ -242,19 +243,30 @@ class WorkerPool:
         else:
             context.mt = MissionTrackingAPI(mission, self._api)
 
-    def translate_mission(self, mission: Mission):
+    def translate_mission(self, mission: Mission) -> Mission:
         """
         Performs any necessary translation from a mission (from its definition coming
         from InOrbit) to one that the current connector can execute.
 
-        For example, connectors may merge two "visit waypoint" into one "navigate from
-        waypoint A to waypoint B" step, if that's how the robot or fleet manager works.
+        By default, iterates over all steps and calls translate_step() on each one.
 
-        The resulting MissionDefinition can then include non-standard MissionSteps.
+        Connectors that need cross-step logic should override this method entirely instead.
 
-        By default it does nothing; simply returns the same mission.
+        The resulting MissionDefinition can include non-standard MissionSteps.
         """
+        mission.definition.steps = [self.translate_step(step) for step in mission.definition.steps]
         return mission
+
+    def translate_step(self, step: MissionStep) -> MissionStep:
+        """
+        Translates a single mission step.
+
+        Override this in connector subclasses to transform individual steps without
+        having to iterate over the mission manually.
+
+        By default returns the step unchanged.
+        """
+        return step
 
     async def submit_work(
         self,

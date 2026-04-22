@@ -13,10 +13,10 @@ from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Union
-
 from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
+from pydantic import model_validator
 
 
 class MissionTrackingTypes(Enum):
@@ -34,6 +34,10 @@ class MissionStepTypes(Enum):
     IF = "if"
 
 
+class TrajectoryTypes(Enum):
+    NURBS = "nurbs"
+
+
 class Robot(BaseModel):
     id: str  # InOrbit robot id
 
@@ -45,7 +49,7 @@ class Pose(BaseModel):
 
     x: float
     y: float
-    theta: float
+    theta: Optional[float] = Field(default=None)
     frame_id: Optional[str] = Field(alias="frameId", default=None)
     waypointId: str = Field(alias="waypointId", default=None)
 
@@ -107,6 +111,46 @@ class MissionStepSetData(MissionStep):
         return MissionStepTypes.SET_DATA.value
 
 
+class RouteSegmentTrajectoryNurbsParameters(BaseModel):
+    degree: int
+    knotVector: List[float]
+    controlPoints: List[Dict[str, float]]
+
+
+class RouteSegmentTrajectory(BaseModel):
+    type: Optional[TrajectoryTypes] = Field(default=None)
+    parameters: Optional[RouteSegmentTrajectoryNurbsParameters] = Field(default=None)
+
+    @model_validator(mode="after")
+    def validate(self):
+        if self.type == TrajectoryTypes.NURBS and self.parameters is None:
+            raise ValueError("parameters are required when type is nurbs")
+        return self
+
+
+class RouteSegmentCorridor(BaseModel):
+    width: Optional[float] = Field(default=None)
+    rightWidth: Optional[float] = Field(default=None)
+    leftWidth: Optional[float] = Field(default=None)
+
+    @model_validator(mode="after")
+    def validate(self):
+        if all([self.leftWidth, self.rightWidth, self.width]):
+            raise ValueError("width should be none if leftWidth and rightWidth are provided")
+        if (self.leftWidth is not None) != (self.rightWidth is not None):
+            raise ValueError("you have to specify both leftWidth and rightWidth")
+        if not any([self.leftWidth, self.rightWidth, self.width]):
+            raise ValueError("you have to specify either width or both leftWidth and rightWidth")
+        return self
+
+
+class RouteSegment(BaseModel):
+    routeId: str
+    trajectory: Optional[RouteSegmentTrajectory] = Field(default=None)
+    corridor: Optional[RouteSegmentCorridor] = Field(default=None)
+    properties: Optional[Dict[str, Dict[str, Optional[str]]]] = Field(default=None)
+
+
 class MissionStepPoseWaypoint(MissionStep):
     """
     Mission step for navigating to a named waypoint.
@@ -115,12 +159,13 @@ class MissionStepPoseWaypoint(MissionStep):
     """
 
     waypoint: Pose
-
-    def get_type(self):
-        return MissionStepTypes.POSE_WAYPOINT.value
+    routeSegment: Optional[RouteSegment] = Field(default=None)
 
     def accept(self, visitor):
         return visitor.visit_pose_waypoint(self)
+
+    def get_type(self):
+        return MissionStepTypes.POSE_WAYPOINT.value
 
 
 class MissionStepWaitUntil(MissionStep):
@@ -251,6 +296,7 @@ class MissionDefinition(BaseModel):
     selector: Any = Field(
         default=None
     )  # Accepted from API just to complete schema in struct mode (and ignore the field)
+    planner: Any = Field(default=None)
     model_config = ConfigDict(extra="forbid")
 
 
