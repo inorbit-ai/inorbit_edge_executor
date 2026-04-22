@@ -61,20 +61,23 @@ def test_edge_all_fields():
         **{
             "routeId": "route-AB",
             "trajectory": {
-                "degree": 3,
-                "knotVector": [0.0, 0.0, 0.0, 1.0, 1.0, 1.0],
-                "controlPoints": [
-                    {"x": 0.0, "y": 0.0},
-                    {"x": 1.0, "y": 0.5},
-                    {"x": 2.0, "y": 0.0},
-                ],
+                "type": "nurbs",
+                "parameters": {
+                    "degree": 3,
+                    "knotVector": [0.0, 0.0, 0.0, 1.0, 1.0, 1.0],
+                    "controlPoints": [
+                        {"x": 0.0, "y": 0.0},
+                        {"x": 1.0, "y": 0.5},
+                        {"x": 2.0, "y": 0.0},
+                    ],
+                },
             },
             "corridor": {"width": 2.0},
             "properties": {"routeSegment": {"maxSpeed": "2"}},
         }
     )
     assert route_segment.routeId == "route-AB"
-    assert route_segment.trajectory.degree == 3
+    assert route_segment.trajectory.parameters.degree == 3
     assert route_segment.corridor.width == 2.0
     assert route_segment.properties == {"routeSegment": {"maxSpeed": "2"}}
 
@@ -138,19 +141,27 @@ def test_edge_trajectory_nurbs():
         **{
             "routeId": "route-1",
             "trajectory": {
-                "degree": 3,
-                "knotVector": [0.0, 0.0, 0.0, 1.0, 1.0, 1.0],
-                "controlPoints": [
-                    {"x": 0.0, "y": 0.0},
-                    {"x": 1.0, "y": 0.5},
-                    {"x": 2.0, "y": 0.0},
-                ],
+                "type": "nurbs",
+                "parameters": {
+                    "degree": 3,
+                    "knotVector": [0.0, 0.0, 0.0, 1.0, 1.0, 1.0],
+                    "controlPoints": [
+                        {"x": 0.0, "y": 0.0},
+                        {"x": 1.0, "y": 0.5},
+                        {"x": 2.0, "y": 0.0},
+                    ],
+                },
             },
         }
     )
-    assert route_segment.trajectory.degree == 3
-    assert len(route_segment.trajectory.knotVector) == 6
-    assert len(route_segment.trajectory.controlPoints) == 3
+    assert route_segment.trajectory.parameters.degree == 3
+    assert len(route_segment.trajectory.parameters.knotVector) == 6
+    assert len(route_segment.trajectory.parameters.controlPoints) == 3
+
+
+def test_edge_trajectory_nurbs_without_parameters_fails():
+    with pytest.raises(ValidationError):
+        RouteSegment(**{"routeId": "route-1", "trajectory": {"type": "nurbs"}})
 
 
 # ---------------------------------------------------------------------------
@@ -171,13 +182,16 @@ def test_mission_step_pose_waypoint_with_full_route_segment():
             "routeSegment": {
                 "routeId": "route-AB",
                 "trajectory": {
-                    "degree": 3,
-                    "knotVector": [0.0, 0.0, 0.0, 1.0, 1.0, 1.0],
-                    "controlPoints": [
-                        {"x": 0.0, "y": 0.0},
-                        {"x": 1.0, "y": 0.5},
-                        {"x": 2.0, "y": 0.0},
-                    ],
+                    "type": "nurbs",
+                    "parameters": {
+                        "degree": 3,
+                        "knotVector": [0.0, 0.0, 0.0, 1.0, 1.0, 1.0],
+                        "controlPoints": [
+                            {"x": 0.0, "y": 0.0},
+                            {"x": 1.0, "y": 0.5},
+                            {"x": 2.0, "y": 0.0},
+                        ],
+                    },
                 },
                 "corridor": {"width": 1.5},
                 "properties": {"routeSegment": {"maxSpeed": "1.5"}},
@@ -185,7 +199,7 @@ def test_mission_step_pose_waypoint_with_full_route_segment():
         }
     )
     assert step.routeSegment.routeId == "route-AB"
-    assert step.routeSegment.trajectory.degree == 3
+    assert step.routeSegment.trajectory.parameters.degree == 3
     assert step.routeSegment.corridor.width == 1.5
     assert step.routeSegment.properties["routeSegment"]["maxSpeed"] == "1.5"
 
@@ -295,9 +309,12 @@ def test_edge_model_dump_round_trip():
         {
             "routeId": "route-AB",
             "trajectory": {
-                "degree": 3,
-                "knotVector": [0.0, 0.0, 0.0, 1.0, 1.0, 1.0],
-                "controlPoints": [{"x": 0.0, "y": 0.0}, {"x": 2.0, "y": 0.0}],
+                "type": "nurbs",
+                "parameters": {
+                    "degree": 3,
+                    "knotVector": [0.0, 0.0, 0.0, 1.0, 1.0, 1.0],
+                    "controlPoints": [{"x": 0.0, "y": 0.0}, {"x": 2.0, "y": 0.0}],
+                },
             },
             "corridor": {"width": 2.0},
             "properties": {"routeSegment": {"maxSpeed": "2"}},
@@ -308,4 +325,4 @@ def test_edge_model_dump_round_trip():
     restored = route_segment.model_validate(dumped)
     assert restored.routeId == "route-AB"
     assert restored.corridor.width == 2.0
-    assert restored.trajectory.degree == 3
+    assert restored.trajectory.parameters.degree == 3
