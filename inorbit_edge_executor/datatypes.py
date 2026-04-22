@@ -33,8 +33,10 @@ class MissionStepTypes(Enum):
     POSE_WAYPOINT = "poseWaypoint"
     IF = "if"
 
+
 class TrajectoryTypes(Enum):
     NURBS = "nurbs"
+
 
 class Robot(BaseModel):
     id: str  # InOrbit robot id
