@@ -143,7 +143,6 @@ class MissionStepPoseWaypoint(MissionStep):
     Note that like MissionStepNamedWaypoint, both are represented with a 'waypoint' field
     """
 
-    model_config = ConfigDict(extra="allow")
     waypoint: Pose
     routeSegment: Optional[RouteSegment] = Field(default=None)
 
