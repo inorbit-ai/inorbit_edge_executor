@@ -33,6 +33,8 @@ class MissionStepTypes(Enum):
     POSE_WAYPOINT = "poseWaypoint"
     IF = "if"
 
+class TrajectoryTypes(Enum):
+    NURBS = "nurbs"
 
 class Robot(BaseModel):
     id: str  # InOrbit robot id
@@ -113,6 +115,17 @@ class RouteSegmentTrajectoryNurbsParameters(BaseModel):
     controlPoints: List[Dict[str, float]]
 
 
+class RouteSegmentTrajectory(BaseModel):
+    type: Optional[TrajectoryTypes] = Field(default=None)
+    parameters: Optional[RouteSegmentTrajectoryNurbsParameters] = Field(default=None)
+
+    @model_validator(mode="after")
+    def validate(self):
+        if self.type == TrajectoryTypes.NURBS and self.parameters is None:
+            raise ValueError("parameters are required when type is nurbs")
+        return self
+
+
 class RouteSegmentCorridor(BaseModel):
     width: Optional[float] = Field(default=None)
     rightWidth: Optional[float] = Field(default=None)
@@ -131,7 +144,7 @@ class RouteSegmentCorridor(BaseModel):
 
 class RouteSegment(BaseModel):
     routeId: str
-    trajectory: Optional[RouteSegmentTrajectoryNurbsParameters] = Field(default=None)
+    trajectory: Optional[RouteSegmentTrajectory] = Field(default=None)
     corridor: Optional[RouteSegmentCorridor] = Field(default=None)
     properties: Optional[Dict[str, Dict[str, Optional[str]]]] = Field(default=None)
 
