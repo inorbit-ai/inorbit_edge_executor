@@ -101,13 +101,13 @@ async def main():
     if INORBIT_API_KEY is None:
         raise ValueError("INORBIT_API_KEY environment variable is not set")
 
-    INORBIT_API_BASE_URL = os.getenv("INORBIT_API_BASE_URL", "https://api.inorbit.ai")
+    INORBIT_API_URL = os.getenv("INORBIT_API_URL", "https://api.inorbit.ai")
 
     ROBOT_ID = os.getenv("ROBOT_ID")
     if ROBOT_ID is None:
         raise ValueError("ROBOT_ID environment variable is not set")
 
-    inorbit_api = InOrbitAPI(base_url=INORBIT_API_BASE_URL, api_key=INORBIT_API_KEY)
+    inorbit_api = InOrbitAPI(base_url=INORBIT_API_URL, api_key=INORBIT_API_KEY)
     worker_pool = WorkerPool(db=db, api=inorbit_api, behavior_tree_builder=MyTreeBuilder())
     # Mission should be already created in InOrbit during the dispatching. Here we mock that by
     # manually creating it using the mission tracking API.
