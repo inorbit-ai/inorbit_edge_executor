@@ -399,6 +399,16 @@ def test_visit_pose_waypoint_theta_none_skips_angular_distance():
     assert "angularDistance" not in wait_node["expression"]
 
 
+def test_visit_pose_waypoint_theta_none_defaults_command_to_zero():
+    run_node, wait_node = _build_waypoint_nodes(
+        {"waypoint": {"x": 1.0, "y": 2.0, "frameId": "map"}}
+    )
+    # Free-planner robots reject a null orientation, so the navigation command defaults to 0.0,
+    # while the arrival check stays orientation-agnostic (no angular distance check).
+    assert run_node["arguments"]["pose"]["theta"] == 0.0
+    assert "angularDistance" not in wait_node["expression"]
+
+
 def test_visit_pose_waypoint_theta_set_includes_angular_distance():
     _, wait_node = _build_waypoint_nodes(
         {"waypoint": {"x": 1.0, "y": 2.0, "theta": 1.57, "frameId": "map"}}

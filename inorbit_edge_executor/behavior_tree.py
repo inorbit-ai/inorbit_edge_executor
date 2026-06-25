@@ -1147,11 +1147,18 @@ class NodeFromStepBuilder:
 
     def visit_pose_waypoint(self, step: MissionStepPoseWaypoint):
         waypoint = step.waypoint
+        # InOrbit allows for heading-less waypoint goals, which may be interpreted by integrations
+        # that override this behavior.
+        # When interpreting a pose waypoint using the waypoint navigation action, default
+        # the theta value to 0.
+        # The arrival check below stays keyed off the original waypoint.theta, so a null theta
+        # still skips the angular check and the waypoint is reached on position alone.
+        pose_theta = waypoint.theta if waypoint.theta is not None else 0.0
         arguments = dict(
             pose=dict(
                 x=waypoint.x,
                 y=waypoint.y,
-                theta=waypoint.theta,
+                theta=pose_theta,
                 frameId=waypoint.frame_id,
             ),
             **({"routeSegment": step.routeSegment.model_dump()} if step.routeSegment else {}),
