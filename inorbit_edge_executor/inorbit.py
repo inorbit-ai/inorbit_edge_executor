@@ -137,7 +137,7 @@ class InOrbitAPI:
 
     def __init__(self, base_url="https://api.inorbit.ai", api_key=None, peer_key=None):
         logger.info("InOrbit API: " + base_url)
-        self._base_url = base_url
+        self._base_url = base_url.rstrip("/")
         self._api_key = api_key
         self._peer_key = peer_key
 
