@@ -499,6 +499,9 @@ class TimeoutNode(BehaviorTree):
                     raise Exception(self.wrapped_bt.last_error)
                 if self.wrapped_bt.state == NODE_STATE_CANCELLED:
                     raise asyncio.CancelledError()
+                if self.wrapped_bt.state == NODE_STATE_PAUSED:
+                    self.state = NODE_STATE_PAUSED
+                    self.last_error = self.wrapped_bt.last_error
         except asyncio.TimeoutError as e:
             raise e
 
